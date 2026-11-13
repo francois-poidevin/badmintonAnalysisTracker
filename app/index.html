@@ -1,0 +1,343 @@
+<!doctype html>
+<meta charset="utf-8"><title>Badminton analysis tracker</title>
+<style>
+body{font:14px system-ui;margin:1rem;max-width:980px}canvas{max-width:100%;background:#000;cursor:crosshair;display:block;margin:.5rem 0}
+fieldset{margin:.5rem 0}button{padding:.4rem .8rem}progress{width:320px;vertical-align:middle}
+#st{font-weight:600}
+</style>
+<h3>Badminton analysis tracker</h3>
+<details id="help"><summary><b>How to use</b> (everything runs in your browser; the video never leaves your computer)</summary>
+<ol>
+<li><b>Video</b>: choose a match clip. Best results: fixed camera, whole court visible, 30 fps, a few minutes at most. It is kept in the browser storage, so it is still there after a reload.</li>
+<li><b>Engines</b> (see choices below), then <b>Weight</b> (used for calories only; changing it later updates the table at once, no re-analysis).</li>
+<li><b>Court</b>: click the 4 court corners on the picture, in this order: far-left, far-right, near-right, near-left (outer lines, doubles court). The corners are used to convert pixels into metres.</li>
+<li><b>Analyse</b>: runs the models on every frame (slow, depends on your GPU; you see what the models detect live). <b>Cancel</b> stops it and discards the partial result.</li>
+<li><b>Preview AR</b>: replays the video with the overlay (court lines, skeletons, player ids and colours, shuttle with tail and speed, mini-map with player paths, distance and kcal table). It can be replayed as often as you want; no new computation.</li>
+<li><b>Export AR mp4</b>: encodes the same overlay into a downloadable MP4 (video only, no sound).</li>
+</ol>
+<p><b>Engines - what each choice means</b></p>
+<ul>
+<li><b>Pose: RTMPose-s + YOLOX-tiny</b> (default, Apache-2.0): two steps, first find each person, then estimate the 17 body points. More accurate on small, far players; slower; the first run also downloads about 40 MB.
+ <b>YOLOv8n-pose</b>: one step, faster, usually less precise on distant players, and its licence (AGPL) is restrictive if you reuse it in a product. Bad pose = wrong feet position, hence wrong distance, calories and map.</li>
+<li><b>Shuttle: TrackNetV3</b> (default, 45 MB download): finds the shuttle in every frame; needed for the shuttle tail and km/h. It reads 8 frames at a time and builds an empty-court background first, so it works best with a fixed camera. <b>off</b>: no shuttle, no speed, but analysis is faster (only the frames selected by "every N" are read).</li>
+<li><b>Analyse every N frames</b> (pose only): 1 = most precise, slowest. 2-5 = faster; the frames in between are interpolated, so quick movements are smoothed (distance may be slightly underestimated). Shuttle detection always uses every frame when it is on.</li>
+</ul>
+<p><b>Court corners</b>: the accuracy of every metre value (positions, distance, calories, shuttle km/h) depends on these 4 clicks. Click precisely on the outer line intersections. Wrong order or a shifted corner gives a mirrored/skewed map and wrong distances. Only people inside the court or within 0.6 m of it are tracked (spectators and referees are ignored). The map shows the far end at the top, as in the corner order above.</p>
+<p><b>Reset</b>: clears the 4 corners <u>and</u> the analysis results (preview and export become unavailable). The video stays loaded. You must click the corners again and re-run Analyse. Use it if a corner was misplaced, or the camera moved. To only change weight, no reset is needed.</p>
+<p><small>Speeds and kcal are estimates: the shuttle speed is measured on the court plane (overestimates when the shuttle is high); calories use average METs by player speed.</small></p>
+</details>
+<fieldset><legend>1. Video</legend><input type="file" id="f" accept="video/*"> <span id="info"></span></fieldset>
+<fieldset><legend>2. Engines</legend>
+ Pose: <select id="poseSel"></select>
+ Shuttle: <select id="shutSel"></select>
+ Weight <input id="kg" type="number" value="70" min="30" max="150" style="width:4em"> kg &nbsp; Analyse every <select id="step"><option>1<option selected>2<option>3<option>5</select> frame(s)
+</fieldset>
+<fieldset><legend>3. Court</legend>click 4 corners: far-left, far-right, near-right, near-left <button id="reset">reset</button></fieldset>
+<fieldset><legend>4. Run</legend>
+ <button id="ana" disabled>Analyse</button> <button id="cancel" disabled>Cancel</button>
+ <button id="prev" disabled>▶ Preview AR</button> <button id="exp" disabled>Export AR mp4</button><br>
+ <progress id="bar" value="0" max="1"></progress> <span id="st">idle</span>
+</fieldset>
+<canvas id="c"></canvas><video id="v" muted playsinline style="display:none"></video>
+<script type="module">
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.mjs';
+import {Muxer, ArrayBufferTarget} from 'https://esm.sh/mp4-muxer@5.2.1';
+const $=id=>document.getElementById(id), v=$('v'), c=$('c'), g=c.getContext('2d',{willReadFrequently:true});
+const FPS=30, W=6.1, L=13.4; // assumed fps; badminton court metres
+const pts=[]; let H=null, Hinv=null, results=[], state='idle'; // results[i]={people:[{box,kp}],shuttle:[x,y]|null}
+
+// ================= state machine =================
+// idle -> (video+court) ready -> analysing -> analysed -> previewing -> analysed ; exporting -> analysed
+function setState(s,msg=''){state=s;
+  const ready=v.src&&H, busy=['analysing','exporting'].includes(s);
+  $('ana').disabled=!ready||busy||s==='previewing'; $('cancel').disabled=!busy;
+  $('prev').disabled=!results.length||busy; $('prev').textContent=s==='previewing'?'⏸ Stop preview':(played?'↻ Replay AR':'▶ Preview AR');
+  $('exp').disabled=!results.length||busy;
+  $('st').textContent=msg||s; if(!busy)$('bar').value=0;}
+const progress=(i,n,label)=>{$('bar').max=n;$('bar').value=i;const t=(performance.now()-t0)/1000,eta=i?t/i*(n-i):0;
+  $('st').textContent=`${label} ${i}/${n} (${(100*i/n)|0}%) ETA ${eta|0}s`};
+let t0=0,cancel=false;
+
+// ================= storage: OPFS =================
+(async()=>{try{const d=await navigator.storage.getDirectory();load(await (await d.getFileHandle('video')).getFile())}catch{}})();
+$('f').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  const d=await navigator.storage.getDirectory(),w=await (await d.getFileHandle('video',{create:true})).createWritable();await w.write(f);await w.close();load(f)};
+function load(f){v.src=URL.createObjectURL(f);v.onloadeddata=()=>{c.width=v.videoWidth&~1;c.height=v.videoHeight&~1;results=[];reset();
+  $('info').textContent=`${v.videoWidth}x${v.videoHeight}, ${v.duration.toFixed(1)}s`;v.currentTime=0}}
+v.onseeked=()=>{if(state!=='analysing'&&state!=='exporting'&&state!=='previewing')draw(results[fi()])};
+const fi=()=>Math.round(v.currentTime*FPS);
+function reset(){played=false;pts.length=0;H=Hinv=null;results=[];setState('idle','click 4 court corners');if(v.readyState)draw()}
+$('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
+
+// ================= geometry =================
+function homography(src,dst){const A=[];src.forEach(([x,y],i)=>{const[u,w]=dst[i];
+  A.push([x,y,1,0,0,0,-u*x,-u*y,u],[0,0,0,x,y,1,-w*x,-w*y,w]);});
+  for(let i=0;i<8;i++){let m=i;for(let r=i+1;r<8;r++)if(Math.abs(A[r][i])>Math.abs(A[m][i]))m=r;[A[i],A[m]]=[A[m],A[i]];
+    for(let r=0;r<8;r++)if(r!==i){const k=A[r][i]/A[i][i];for(let j=i;j<9;j++)A[r][j]-=k*A[i][j];}}
+  return [...A.map((r,i)=>r[8]/r[i]),1];}
+const proj=(h,x,y)=>{const d=h[6]*x+h[7]*y+h[8];return[(h[0]*x+h[1]*y+h[2])/d,(h[3]*x+h[4]*y+h[5])/d]};
+c.onclick=e=>{if(pts.length>=4||!v.src)return;const r=c.getBoundingClientRect();
+  pts.push([(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]);
+  if(pts.length===4){const C=[[0,0],[W,0],[W,L],[0,L]];H=homography(C,pts);Hinv=homography(pts,C);setState('ready','court set: press Analyse')}
+  draw()};
+
+// ================= engines (registry: add a new model = add one entry) =================
+// pose engine : {name, load(), run(canvas)->[{box:[x1,y1,x2,y2],kp:[[x,y,score]*17]}]}
+// shuttle engine: {name, load(), run(canvas,frameIndex)->[x,y]|null}
+const session=(url,eps=['webgpu','wasm'])=>ort.InferenceSession.create(url,{executionProviders:eps});
+const mk=(w,h)=>{const k=document.createElement('canvas');k.width=w;k.height=h;return k};
+const iou=(a,b)=>{const w=Math.min(a[2],b[2])-Math.max(a[0],b[0]),h=Math.min(a[3],b[3])-Math.max(a[1],b[1]);if(w<=0||h<=0)return 0;const i=w*h;return i/((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i)};
+const nms=(r,t=.5)=>{r.sort((a,b)=>b.cf-a.cf);const k=[];for(const a of r)if(k.every(b=>iou(a.box,b.box)<t))k.push(a);return k};
+const HF='https://huggingface.co/';
+
+// --- A) YOLOv8n-pose: one stage (AGPL upstream)
+const yolov8={name:'YOLOv8n-pose (1 stage, AGPL)',s:null,t:mk(640,640),
+ async load(){this.s??=await session(HF+'Xenova/yolov8n-pose/resolve/main/onnx/model.onnx')},
+ async run(src){const t=this.t,tg=t.getContext('2d',{willReadFrequently:true}),sc=Math.min(640/src.width,640/src.height),dw=src.width*sc,dh=src.height*sc,ox=(640-dw)/2,oy=(640-dh)/2;
+  tg.fillStyle='#727272';tg.fillRect(0,0,640,640);tg.drawImage(src,ox,oy,dw,dh);
+  const px=tg.getImageData(0,0,640,640).data,f=new Float32Array(3*409600);
+  for(let i=0;i<409600;i++){f[i]=px[i*4]/255;f[i+409600]=px[i*4+1]/255;f[i+819200]=px[i*4+2]/255}
+  const o=(await this.s.run({[this.s.inputNames[0]]:new ort.Tensor('float32',f,[1,3,640,640])}))[this.s.outputNames[0]].data,N=8400,r=[];
+  for(let i=0;i<N;i++){const cf=o[4*N+i];if(cf<.4)continue;const cx=o[i],cy=o[N+i],w=o[2*N+i],h=o[3*N+i];
+   r.push({cf,box:[(cx-w/2-ox)/sc,(cy-h/2-oy)/sc,(cx+w/2-ox)/sc,(cy+h/2-oy)/sc],kp:Array.from({length:17},(_,k)=>[(o[(5+3*k)*N+i]-ox)/sc,(o[(6+3*k)*N+i]-oy)/sc,o[(7+3*k)*N+i]])})}
+  return nms(r)}};
+
+// --- B) RTMPose-s (Apache-2.0) top-down, person boxes from YOLOX-tiny (Apache-2.0)
+const yolox={s:null,t:mk(416,544),
+ async load(){this.s??=await session(HF+'cj-mills/yolox-coco-baseline-onnx/resolve/main/coco-yolox_tiny.onnx',['wasm'])}/* WebGPU fails: unfolded BatchNormalization */,
+ async run(src){const Wi=416,Hi=544,sc=Math.min(Wi/src.width,Hi/src.height),tg=this.t.getContext('2d',{willReadFrequently:true});
+  tg.fillStyle='rgb(114,114,114)';tg.fillRect(0,0,Wi,Hi);tg.drawImage(src,0,0,src.width*sc,src.height*sc);
+  const px=tg.getImageData(0,0,Wi,Hi).data,P=Wi*Hi,f=new Float32Array(3*P);
+  for(let i=0;i<P;i++){f[i]=px[i*4];f[P+i]=px[i*4+1];f[2*P+i]=px[i*4+2]}  // raw 0-255, verified on a test image
+  const o=(await this.s.run({input:new ort.Tensor('float32',f,[1,3,Hi,Wi])})).output.data,r=[];let i=0;
+  for(const st of [8,16,32])for(let y=0;y<Hi/st;y++)for(let x=0;x<Wi/st;x++,i++){const b=i*85,cf=o[b+4]*o[b+5];if(cf<.5)continue; // class 0 = person
+    const cx=(o[b]+x)*st/sc,cy=(o[b+1]+y)*st/sc,w=Math.exp(o[b+2])*st/sc,h=Math.exp(o[b+3])*st/sc;r.push({cf,box:[cx-w/2,cy-h/2,cx+w/2,cy+h/2]})}
+  return nms(r,.45)}};
+const rtmpose={name:'RTMPose-s + YOLOX-tiny (Apache-2.0)',s:null,t:mk(192,256),
+ async load(){await yolox.load();this.s??=await session(HF+'bukuroo/RTMPose-ONNX/resolve/main/rtmpose-s.onnx')},
+ async run(src){const out=[],tg=this.t.getContext('2d',{willReadFrequently:true}),M=[123.675,116.28,103.53],S=[58.395,57.12,57.375];
+  for(const d of await yolox.run(src)){
+   let cx=(d.box[0]+d.box[2])/2,cy=(d.box[1]+d.box[3])/2,w=(d.box[2]-d.box[0])*1.25,h=(d.box[3]-d.box[1])*1.25;
+   if(w/h>192/256)h=w*256/192;else w=h*192/256;           // keep model aspect
+   tg.fillStyle='#000';tg.fillRect(0,0,192,256);tg.drawImage(src,cx-w/2,cy-h/2,w,h,0,0,192,256);
+   const px=tg.getImageData(0,0,192,256).data,f=new Float32Array(3*49152);
+   for(let i=0;i<49152;i++)for(let k=0;k<3;k++)f[k*49152+i]=(px[i*4+k]-M[k])/S[k]; // RGB, mean/std
+   const r=await this.s.run({input:new ort.Tensor('float32',f,[1,3,256,192])}),sx=r.simcc_x.data,sy=r.simcc_y.data;
+   const am=(a,o,n)=>{let b=0,bi=0;for(let i=0;i<n;i++)if(a[o+i]>b||i===0){b=a[o+i];bi=i}return[bi,b]};
+   const kp=[];for(let k=0;k<17;k++){const[xi,xs]=am(sx,k*384,384),[yi,ys]=am(sy,k*512,512);
+     kp.push([cx-w/2+xi/2/192*w,cy-h/2+yi/2/256*h,Math.min(xs,ys)])} // simcc split ratio 2
+   out.push({box:d.box,kp,cf:d.cf})}
+  return out}};
+const POSE=[yolov8,rtmpose];
+// --- shuttle slot: TrackNetV3 needs 8-frame stacks + background median and an ONNX export (open weights are .pt only).
+const TH=288,TW=512,TP=TH*TW; // TrackNetV3 input size
+const tracknet={name:'TrackNetV3 (MIT, 45 MB)',s:null,t:mk(TW,TH),
+ async load(){this.s??=await session(HF+'jinergenkai/badminton-analysis-web/resolve/main/tracknet3_fp32.onnx')},
+ raw(src){const tg=this.t.getContext('2d',{willReadFrequently:true});tg.drawImage(src,0,0,TW,TH);return tg.getImageData(0,0,TW,TH).data},
+ frame(src){const px=this.raw(src),f=new Float32Array(3*TP);for(let i=0;i<TP;i++){f[i]=px[i*4]/255;f[TP+i]=px[i*4+1]/255;f[2*TP+i]=px[i*4+2]/255}return f},
+ // per-pixel median of ~24 frames spread over the video = empty-court background (players/shuttle vanish)
+ async background(seekTo,dur,onp){const K=24,smp=[];for(let k=0;k<K;k++){if(cancel)break;await seekTo(dur*(k+.5)/K);const px=this.raw(v);const u=new Uint8Array(3*TP);
+   for(let i=0;i<TP;i++){u[i]=px[i*4];u[TP+i]=px[i*4+1];u[2*TP+i]=px[i*4+2]}smp.push(u);onp(k+1,K)}
+  const bg=new Float32Array(3*TP),tmp=new Uint8Array(smp.length);
+  for(let i=0;i<3*TP;i++){for(let k=0;k<smp.length;k++)tmp[k]=smp[k][i];tmp.sort();bg[i]=tmp[smp.length>>1]/255}return bg},
+ // frames: 8 consecutive Float32 planar RGB; input = [median bg(3) + 8x3 + 5 zero channels] = 32 ch (layout from the model card)
+ async run(frames,bg){const inp=new Float32Array(32*TP);inp.set(bg,0);frames.forEach((f,j)=>inp.set(f,(3+3*j)*TP));
+  const hm=this.hm=(await this.s.run({input:new ort.Tensor('float32',inp,[1,32,TH,TW])})).heatmap.data,out=[];
+  for(let j=0;j<8;j++){const o=j*TP;let b=0.5,bi=-1;for(let i=0;i<TP;i++)if(hm[o+i]>b){b=hm[o+i];bi=i}
+   if(bi<0){out.push(null);continue}
+   const cx=bi%TW,cy=(bi/TW)|0;let sx=0,sy=0,sw=0;  // weighted centroid around the peak
+   for(let y=Math.max(0,cy-3);y<=Math.min(TH-1,cy+3);y++)for(let x=Math.max(0,cx-3);x<=Math.min(TW-1,cx+3);x++){const w=hm[o+y*TW+x];if(w>.2){sx+=w*x;sy+=w*y;sw+=w}}
+   out.push([sx/sw,sy/sw])}
+  return out}};
+const SHUT=[{name:'off',async load(){}},tracknet];
+POSE.forEach((e,i)=>$('poseSel').add(new Option(e.name,i)));SHUT.forEach((e,i)=>$('shutSel').add(new Option(e.name,i)));
+$('poseSel').value=1;$('shutSel').value=1; // RTMPose + TrackNetV3 by default
+
+// ================= drawing =================
+const SK=[[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
+function overlay(g,res,f){
+  g.lineWidth=Math.max(2,c.width/500);
+  if(!H){g.fillStyle='#c6f432';pts.forEach(([x,y])=>{g.beginPath();g.arc(x,y,8,0,7);g.fill()});return}
+  const ln=[[[0,0],[W,0],[W,L],[0,L],[0,0]],[[0,L/2],[W,L/2]],[[W/2,0],[W/2,L/2-1.98]],[[W/2,L/2+1.98],[W/2,L]],[[0,L/2-1.98],[W,L/2-1.98]],[[0,L/2+1.98],[W,L/2+1.98]],[[.46,0],[.46,L]],[[W-.46,0],[W-.46,L]],[[0,.76],[W,.76]],[[0,L-.76],[W,L-.76]]];
+  g.strokeStyle='#c6f432';for(const l of ln){g.beginPath();l.forEach(([x,y],i)=>{const[u,w]=proj(H,x,y);i?g.lineTo(u,w):g.moveTo(u,w)});g.stroke()}
+  const pos=[];
+  if(!res||!res.people)return minimap(g,pos,res);g.font=`${Math.max(14,c.width/70)}px system-ui`;
+  for(const p of res.people){const col=p.id==null?'#bbb':PC[p.id%4];g.globalAlpha=p.interp?.55:1;g.strokeStyle=col;g.beginPath();
+   for(const[a,b]of SK)if(p.kp[a][2]>.3&&p.kp[b][2]>.3){g.moveTo(p.kp[a][0],p.kp[a][1]);g.lineTo(p.kp[b][0],p.kp[b][1])}g.stroke();
+   const[x,y]=footImg(p),[mx,my]=p.cpos||proj(Hinv,x,y);if(p.id!=null)pos.push([mx,my,p.id]);
+   g.fillStyle=col;g.strokeStyle='#fff';g.beginPath();g.arc(x,y,6,0,7);g.fill();g.stroke();g.fillStyle='#fff';g.fillText(`${p.id==null?'':'P'+(p.id+1)+' '}${mx.toFixed(1)},${my.toFixed(1)} m`,x+10,y);g.globalAlpha=1}
+  tail(g,res,f);minimap(g,pos,res,f)}
+// comet tail: length grows with speed (3 frames at rest -> 25 frames at ~440 km/h)
+function tail(g,res,f){if(!res.shuttle)return;const K=Math.max(3,Math.min(25,Math.round(3+(res.kmh||0)/20))),P=[res.shuttle];
+  for(let j=1;j<=K&&f-j>=0;j++){const q=results[f-j]&&results[f-j].shuttle;if(!q)break;P.push(q)}
+  g.save();g.lineCap='round';const r=Math.max(5,c.width/170);
+  for(let k=P.length-1;k>=1;k--){const u=1-k/P.length;g.strokeStyle=`rgba(255,225,77,${.15+.7*u})`;g.lineWidth=r*(.3+1.2*u);
+    g.beginPath();g.moveTo(P[k][0],P[k][1]);g.lineTo(P[k-1][0],P[k-1][1]);g.stroke()}
+  g.fillStyle='#fff';g.strokeStyle='#ffe14d';g.lineWidth=2;g.beginPath();g.arc(P[0][0],P[0][1],r,0,7);g.fill();g.stroke();g.restore()}
+// top-down court (far end at top) in the top-right corner; burned into preview and export
+const PC=['#22c3b4','#4b8df8','#a77bf3','#ff7a4d'];
+const TAILF=300; // path tail = last 10 s (at 30 fps)
+function minimap(g,pos,res,f){
+  const ph=c.height*.38,k=ph/L,pw=W*k,m=c.width/80,x0=c.width-pw-m,y0=m,X=a=>x0+a*k,Y=a=>y0+a*k;
+  g.save();g.fillStyle='rgba(10,26,51,.75)';g.fillRect(x0-6,y0-6,pw+12,ph+12);
+  g.save();g.beginPath();g.rect(x0-6,y0-6,pw+12,ph+12);g.clip();                // everything on the map is clipped to the panel
+  g.strokeStyle='#c6f432';g.lineWidth=Math.max(1,c.width/900);
+  g.strokeRect(X(0),Y(0),pw,ph);
+  const seg=(a,b,c2,d)=>{g.beginPath();g.moveTo(X(a),Y(b));g.lineTo(X(c2),Y(d));g.stroke()};
+  seg(0,L/2,W,L/2);seg(0,L/2-1.98,W,L/2-1.98);seg(0,L/2+1.98,W,L/2+1.98);seg(W/2,0,W/2,L/2-1.98);seg(W/2,L/2+1.98,W/2,L);
+  seg(.46,0,.46,L);seg(W-.46,0,W-.46,L);seg(0,.76,W,.76);seg(0,L-.76,W,L-.76);
+  if(res&&res.byId&&f!=null){g.lineCap='round';g.lineJoin='round';           // per-player path of the last TAILF frames, fading with age
+    for(let id=0;id<res.byId.length;id++){let prev=null,pf=0;
+      for(let q=TAILF;q>=0;q-=2){const r=results[f-q],p=r&&r.byId&&r.byId[id];if(!p||!p.cpos){prev=null;continue}
+        if(prev){g.strokeStyle=PC[id%4];g.globalAlpha=.12+.8*(1-q/TAILF);g.lineWidth=Math.max(1.5,c.width/700)*(.6+.8*(1-q/TAILF));
+          g.beginPath();g.moveTo(X(prev[0]),Y(prev[1]));g.lineTo(X(p.cpos[0]),Y(p.cpos[1]));g.stroke()}
+        prev=p.cpos}}
+    g.globalAlpha=1}
+  pos.forEach(([mx,my,id])=>{if(mx<-1.5||mx>W+1.5||my<-1.5||my>L+1.5)return;g.fillStyle=PC[id%4];g.strokeStyle='#fff';
+    g.beginPath();g.arc(X(mx),Y(my),Math.max(5,c.width/150),0,7);g.fill();g.stroke()});
+  g.restore();
+  const lh=Math.max(24,c.width/45),xr=x0+pw+6;let y=y0+ph+8;                       // speed block, then stats table (right-aligned)
+  if(res&&res.kmh!=null){g.fillStyle='rgba(10,26,51,.75)';g.fillRect(x0-6,y,pw+12,lh*2.3);g.font=`bold ${Math.max(14,c.width/60)}px system-ui`;g.textAlign='center';g.fillStyle='#ffe14d';
+    g.fillText(`${Math.round(res.kmh)} km/h`,x0+pw/2,y+lh);g.font=`${Math.max(12,c.width/85)}px system-ui`;g.fillStyle='#fff';
+    g.fillText(`max ${Math.round(res.kmax)} km/h (approx.)`,x0+pw/2,y+lh*1.9)}
+  y+=lh*2.3+8;
+  if(res&&res.stats&&res.stats.length){const kg=+$('kg').value||70,fs=Math.max(12,c.width/85),rh=fs*1.6,tw=Math.max(pw+12,fs*14),xl=xr-tw;
+    g.fillStyle='rgba(10,26,51,.75)';g.fillRect(xl,y,tw,rh*(res.stats.length+1)+6);g.font=`${fs}px system-ui`;g.textAlign='right';
+    g.fillStyle='#9fb3cf';g.fillText('Player',xl+fs*5,y+rh);g.fillText('distance',xl+fs*9.2,y+rh);g.fillText('kcal',xr-6,y+rh);
+    res.stats.forEach((st,id)=>{const yy=y+rh*(id+2);g.fillStyle=PC[id%4];g.beginPath();g.arc(xl+fs*.8,yy-fs*.35,fs*.4,0,7);g.fill();
+      g.fillStyle='#fff';g.fillText('P'+(id+1),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*9.2,yy);g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)})}
+  g.restore()}
+function draw(res,f=fi()){g.drawImage(v,0,0,c.width,c.height);overlay(g,res,f)}
+
+// ================= tracking: stable player ids + gap filling =================
+// foot point in image px: ankles, else one ankle, else bottom-centre of the box
+function footImg(p){const a=p.kp[15],b=p.kp[16];
+  if(a[2]>.3&&b[2]>.3)return[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  if(a[2]>.3||b[2]>.3){const q=a[2]>b[2]?a:b;return[q[0],q[1]]}
+  return[(p.box[0]+p.box[2])/2,p.box[3]]}
+const MAXP=4, MARGIN=0.6, MAXGAP=FPS; // players, metres outside court still counted, max gap (frames) to interpolate
+function track(res,n){
+  const T=[],keys=res.map((r,i)=>r&&r.people?i:-1).filter(i=>i>=0);
+  for(const i of keys){
+    const dets=[];for(const p of res[i].people){const[x,y]=footImg(p),[mx,my]=proj(Hinv,x,y);
+      if(mx>-MARGIN&&mx<W+MARGIN&&my>-MARGIN&&my<L+MARGIN)dets.push({p,pos:[mx,my]})}   // keeps only players on / right next to the court
+    const pairs=[];dets.forEach((d,di)=>T.forEach((t,ti)=>{const dt=(i-t.last.i)/FPS,
+      dist=Math.hypot(d.pos[0]-t.last.pos[0],d.pos[1]-t.last.pos[1]);if(dist<Math.min(6,1+3*dt))pairs.push([dist,di,ti])}));
+    pairs.sort((a,b)=>a[0]-b[0]);const du=new Set,tu=new Set;
+    for(const[,di,ti]of pairs)if(!du.has(di)&&!tu.has(ti)){du.add(di);tu.add(ti);const t=T[ti];t.obs.push({i,p:dets[di].p});t.last={i,pos:dets[di].pos}}
+    dets.forEach((d,di)=>{if(!du.has(di)&&T.length<MAXP){T.push({id:T.length,obs:[{i,p:d.p}],last:{i,pos:d.pos}})}});
+  }
+  // dense output: every frame, observed or interpolated (gap <= MAXGAP)
+  const out=Array.from({length:n},(_,f)=>({people:[],shuttle:res[f]?res[f].shuttle:null}));
+  const lerp=(a,b,u)=>a+(b-a)*u;
+  for(const t of T){const o=t.obs;
+    for(let j=0;j<o.length;j++){const A=o[j];out[A.i].people.push({...A.p,id:t.id,interp:false});
+      const B=o[j+1];if(!B||B.i-A.i<2||B.i-A.i>MAXGAP)continue;
+      for(let f=A.i+1;f<B.i;f++){const u=(f-A.i)/(B.i-A.i);
+        out[f].people.push({id:t.id,interp:true,box:A.p.box.map((v,k)=>lerp(v,B.p.box[k],u)),
+          kp:A.p.kp.map((k,q)=>[lerp(k[0],B.p.kp[q][0],u),lerp(k[1],B.p.kp[q][1],u),Math.min(k[2],B.p.kp[q][2])])})}}}
+  shuttlePost(out);statsPost(out,T.length);
+  return{out,tracks:T.length,filled:out.reduce((s,r)=>s+r.people.filter(p=>p.interp).length,0)}}
+
+// ================= shuttle: clean-up + speed =================
+// Speed = ground-plane distance between positions 3 frames apart. The shuttle flies above the court plane, so this is an
+// APPROXIMATION (overestimates when the shuttle is high/far). Shown as km/h.
+const KS=3, VMAX=167; // frames between samples, reject > 600 km/h
+function shuttlePost(out){const n=out.length,gnd=p=>proj(Hinv,p[0],p[1]);
+  let last=-1;                                           // 1) reject impossible jumps
+  for(let f=0;f<n;f++){const p=out[f].shuttle;if(!p)continue;
+    if(last>=0&&f-last<=4){const a=gnd(out[last].shuttle),b=gnd(p);if(Math.hypot(a[0]-b[0],a[1]-b[1])/((f-last)/FPS)>VMAX){out[f].shuttle=null;continue}}
+    last=f}
+  for(let f=0,prev=-1;f<n;f++){if(!out[f].shuttle)continue;                // 2) fill gaps <= 3 frames
+    if(prev>=0&&f-prev>1&&f-prev<=4)for(let k=prev+1;k<f;k++){const u=(k-prev)/(f-prev),A=out[prev].shuttle,B=out[f].shuttle;out[k].shuttle=[A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u]}
+    prev=f}
+  let mx=0,cur=null,age=0;                                // 3) speed + running max
+  for(let f=0;f<n;f++){const a=out[f].shuttle,b=f>=KS?out[f-KS].shuttle:null;
+    if(a&&b){const pa=gnd(a),pb=gnd(b);cur=Math.hypot(pa[0]-pb[0],pa[1]-pb[1])/(KS/FPS)*3.6;age=0}else if(++age>5)cur=null;
+    if(cur!=null)mx=Math.max(mx,cur);out[f].kmh=cur;out[f].kmax=mx}}
+
+// ================= per-player stats =================
+// positions smoothed (5-frame mean), 1.5 cm dead-zone against jitter, steps > 12 m/s ignored.
+// calories = MET * kg * hours, MET from smoothed speed (3.5 ready / 5 / 6.5 / 8.5 competitive badminton, rough values).
+const MET=v=>v<.5?3.5:v<1.5?5:v<2.5?6.5:8.5;
+function statsPost(out,nT){const hist=Array.from({length:nT},()=>[]),acc=Array.from({length:nT},()=>({d:0,ckg:0,last:null,v:0}));
+  for(const r of out){r.byId=[];r.stats=[];
+    for(const p of r.people){const[x,y]=footImg(p),q=proj(Hinv,x,y),h=hist[p.id];h.push(q);if(h.length>5)h.shift();
+      const sm=[h.reduce((s,a)=>s+a[0],0)/h.length,h.reduce((s,a)=>s+a[1],0)/h.length];p.cpos=sm;r.byId[p.id]=p;
+      const a=acc[p.id];if(a.last){const dd=Math.hypot(sm[0]-a.last[0],sm[1]-a.last[1]),sp=dd*FPS;
+        if(dd>.015&&sp<12)a.d+=dd;a.v=.9*a.v+.1*(dd>.015&&sp<12?sp:0)}
+      a.last=sm;a.ckg+=MET(a.v)/FPS/3600}
+    for(let id=0;id<nT;id++)r.stats[id]={d:acc[id].d,ckg:acc[id].ckg}}}
+
+// ================= live "under the hood" view during analysis =================
+const live={people:[],shut:[],hm:null,msg:''};const hmC=mk(TW,TH);
+function liveDraw(i,n){g.drawImage(v,0,0,c.width,c.height); // redraw frame, then add court, raw detections (boxes+conf, keypoints coloured by score), heatmap, shuttle path
+  overlay(g,{people:null});const fs=Math.max(12,c.width/80);g.save();g.lineWidth=Math.max(1.5,c.width/700);g.font=`${fs}px system-ui`;
+  if(live.hm){const ctx=hmC.getContext('2d'),im=ctx.createImageData(TW,TH),o=live.hmj*TP;for(let k=0;k<TP;k++){const a=live.hm[o+k];im.data[4*k]=255;im.data[4*k+1]=a>.5?255:60;im.data[4*k+3]=Math.min(255,a*500)}
+    ctx.putImageData(im,0,0);g.globalAlpha=.75;g.drawImage(hmC,0,0,c.width,c.height);g.globalAlpha=1}
+  for(const p of live.people){g.strokeStyle='rgba(255,255,255,.85)';g.strokeRect(p.box[0],p.box[1],p.box[2]-p.box[0],p.box[3]-p.box[1]);
+    if(p.cf!=null){g.fillStyle='#fff';g.fillText((p.cf*100|0)+'%',p.box[0]+3,p.box[1]-4)}
+    g.strokeStyle='rgba(34,195,180,.8)';g.beginPath();for(const[a,b]of SK)if(p.kp[a][2]>.3&&p.kp[b][2]>.3){g.moveTo(p.kp[a][0],p.kp[a][1]);g.lineTo(p.kp[b][0],p.kp[b][1])}g.stroke();
+    for(const k of p.kp){g.fillStyle=`hsl(${Math.min(1,Math.max(0,k[2]))*120},95%,55%)`;g.beginPath();g.arc(k[0],k[1],Math.max(3,c.width/330),0,7);g.fill()}}
+  g.strokeStyle='#ffe14d';g.fillStyle='#ffe14d';g.beginPath();live.shut.forEach((p,k)=>{if(!p)return;k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])});g.stroke();
+  live.shut.forEach(p=>{if(p){g.beginPath();g.arc(p[0],p[1],Math.max(3,c.width/250),0,7);g.fill()}});
+  g.fillStyle='rgba(10,26,51,.75)';g.fillRect(6,6,fs*26,fs*2.2);g.fillStyle='#fff';g.fillText(`frame ${i}/${n}  ${live.msg}`,12,6+fs*1.4);g.restore()}
+const hold=i=>results[Math.min(i,results.length-1)]; // frames skipped by "every N" reuse last analysed one
+const seek=t=>new Promise(r=>{if(Math.abs(v.currentTime-t)<1e-4&&!v.seeking)return r();v.addEventListener('seeked',r,{once:true});v.currentTime=t});
+
+// ================= analyse =================
+$('ana').onclick=async()=>{
+  const pose=POSE[$('poseSel').value],shut=SHUT[$('shutSel').value],step=+$('step').value,n=Math.floor(v.duration*FPS);
+  results=[];played=false;cancel=false;setState('analysing','loading models...');
+  try{await pose.load();await shut.load()}catch(e){setState('ready','model error: '+e.message);return}
+  t0=performance.now();
+  try{let bg=null;
+    if(shut.run){setState('analysing','building background...');bg=await shut.background(seek,v.duration,(i,k)=>progress(i,k,'background'));t0=performance.now()}
+    const B=shut.run?8:1;results=new Array(n);
+    for(let w=0;w<n&&!cancel;w+=B){const fr=[];
+      for(let j=0;j<B;j++){const i=Math.min(w+j,n-1);if(!shut.run&&i%step)continue;
+        await seek(i/FPS);g.drawImage(v,0,0,c.width,c.height);
+        if(w+j<n&&i%step===0){const t1=performance.now();live.people=await pose.run(c);(results[i]??={}).people=live.people;live.msg=`pose ${(performance.now()-t1)|0} ms, ${live.people.length} detected`}
+        if(shut.run)fr.push(shut.frame(c));
+        liveDraw(i,n)}                                   // drawn every frame -> no blinking
+      if(shut.run){const t2=performance.now();const out=await shut.run(fr,bg);live.hm=shut.hm;live.hmj=Math.min(7,fr.length-1);
+        live.shut=out.map(p=>p&&[p[0]*c.width/TW,p[1]*c.height/TH]);live.msg+=`  | TrackNet ${(performance.now()-t2)|0} ms`;liveDraw(Math.min(w+live.hmj,n-1),n)
+        out.forEach((p,j)=>{const i=w+j;if(i<n)(results[i]??={people:null}).shuttle=p?[p[0]*c.width/TW,p[1]*c.height/TH]:null})}
+      progress(w,n,'analysing')}live.people=[];live.shut=[];live.hm=null}
+  catch(e){console.error(e);results=[];setState('ready','ERROR: '+String(e.message||e).slice(0,200));return}
+  if(cancel){results=[];setState('ready','cancelled')}else{const r=track(results,Math.floor(v.duration*FPS));results=r.out;v.currentTime=0;setState('analysed',`${r.tracks} players tracked, ${r.filled} gaps filled - press Preview`)}};
+$('cancel').onclick=()=>cancel=true;
+
+// ================= preview (no inference, uses stored results) =================
+let played=false,runId=0; // played = a preview already ran -> button says Replay
+$('prev').onclick=async()=>{
+  if(state==='previewing'){v.pause();return}            // stop: the pause listener below resets the state
+  const id=++runId;setState('previewing');
+  await seek(0);                                         // always restart from the beginning
+  try{await v.play()}catch(e){setState('analysed','play failed: '+e.message);return}   // wait until really playing
+  let finished=false;
+  const finish=()=>{if(finished||id!==runId)return;finished=true;v.removeEventListener('pause',finish);v.removeEventListener('ended',finish);
+    draw(hold(fi()),fi());played=true;setState('analysed',v.ended?'preview finished - press Replay':'preview stopped - press Replay')};
+  v.addEventListener('pause',finish);v.addEventListener('ended',finish);              // 'ended' also fires 'pause'; guarded
+  const loop=()=>{if(id!==runId||finished)return;draw(hold(fi()),fi());if(!v.paused&&!v.ended)v.requestVideoFrameCallback(loop)};
+  v.requestVideoFrameCallback(loop)};
+
+// ================= export (also from stored results: fast, no inference) =================
+$('exp').onclick=async()=>{
+  const n=Math.floor(v.duration*FPS);setState('exporting','encoding...');cancel=false;t0=performance.now();
+  let enc;
+  try{
+    const m=new Muxer({target:new ArrayBufferTarget(),video:{codec:'avc',width:c.width,height:c.height},fastStart:'in-memory'});
+    let err=null;enc=new VideoEncoder({output:(ch,md)=>m.addVideoChunk(ch,md),error:e=>err=e});
+    enc.configure({codec:'avc1.640034',width:c.width,height:c.height,bitrate:6e6,framerate:FPS});
+    for(let i=0;i<n;i++){if(cancel){enc.close();setState('analysed','export cancelled');return}if(err)throw err;
+      await seek(i/FPS);draw(hold(i),i);
+      const fr=new VideoFrame(c,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)}); // duration is required by the muxer
+      enc.encode(fr,{keyFrame:i%60===0});fr.close();
+      if(enc.encodeQueueSize>10)await new Promise(r=>setTimeout(r));progress(i,n,'encoding')}
+    await enc.flush();if(err)throw err;m.finalize();
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([m.target.buffer],{type:'video/mp4'}));a.download='rally-ar.mp4';a.click();
+    setState('analysed','exported '+(m.target.buffer.byteLength/1e6).toFixed(1)+' MB')
+  }catch(e){console.error(e);try{enc&&enc.state!=='closed'&&enc.close()}catch{}setState('analysed','EXPORT ERROR: '+String(e.message||e).slice(0,200))}};
+setState('idle','pick a video');
+</script>

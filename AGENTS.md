@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Client-only badminton rally analyser (own implementation, inspired by v-skor.com). No build, no package.json, no git repo.
+Client-only badminton rally analyser (own implementation, inspired by refApp1). No build, no package.json, no git repo.
 
 ## Layout
 - `app/index.html`: the whole app (single file, one inline `<script type="module">`). Edit this.
-- `src/`: **downloaded v-skor.com JS, reference only.** Header says "all rights reserved, no copying". Never copy code from it into `app/`; their `.vsm` models are AES-encrypted + domain-locked, do not try to decrypt/fetch them.
+- `src/`: **downloaded refApp1 JS, reference only.** Header says "all rights reserved, no copying". Never copy code from it into `app/`; their `.vsm` models are AES-encrypted + domain-locked, do not try to decrypt/fetch them.
 - `SPEC.md`: findings, design decisions, bug post-mortems. Append new decisions/fixes there.
 
 ## Run / verify

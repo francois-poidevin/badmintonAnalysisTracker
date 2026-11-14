@@ -5,14 +5,37 @@ body{font:14px system-ui;margin:1rem;max-width:980px}canvas{max-width:100%;backg
 fieldset{margin:.5rem 0}button{padding:.4rem .8rem}progress{width:320px;vertical-align:middle}
 #st{font-weight:600}
 </style>
-<h3>Badminton analysis tracker</h3>
-<details id="help"><summary><b>How to use</b> (everything runs in your browser; the video never leaves your computer)</summary>
-<ol>
+<button id="lang" style="position:fixed;top:.5rem;right:.5rem;z-index:9"></button>
+<h3 data-i="title"></h3>
+<details id="help"><summary data-i="helpSum"></summary>
+<div id="helpBody" data-i="help"></div></details>
+<fieldset><legend data-i="lg1"></legend><input type="file" id="f" accept="video/*"> <span id="info"></span></fieldset>
+<fieldset><legend data-i="lg2"></legend>
+ <span data-i="pose"></span> <select id="poseSel"></select>
+ <span data-i="shuttle"></span> <select id="shutSel"></select>
+ <span data-i="weight"></span> <input id="kg" type="number" value="70" min="30" max="150" style="width:4em"> kg &nbsp; <span data-i="every"></span> <select id="step"><option>1<option selected>2<option>3<option>5</select> <span data-i="frames"></span>
+</fieldset>
+<fieldset><legend data-i="lg3"></legend><span data-i="courtTxt"></span> <button id="reset" data-i="reset"></button></fieldset>
+<fieldset><legend data-i="lg4"></legend>
+ <button id="ana" data-i="ana" disabled></button> <button id="cancel" data-i="cancel" disabled></button>
+ <button id="prev" disabled></button> <button id="exp" data-i="exp" disabled></button><br>
+ <progress id="bar" value="0" max="1"></progress> <span id="st"></span>
+</fieldset>
+<canvas id="c"></canvas><video id="v" muted playsinline style="display:none"></video>
+<script type="module">
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.mjs';
+import {Muxer, ArrayBufferTarget} from 'https://esm.sh/mp4-muxer@5.2.1';
+const $=id=>document.getElementById(id), v=$('v'), c=$('c'), g=c.getContext('2d',{willReadFrequently:true});
+const FPS=30, W=6.1, L=13.4; // assumed fps; badminton court metres
+
+// ================= i18n (EN/FR): static text via data-i, status via T(), canvas text via T()/ts() =================
+const I={
+en:{title:'Badminton analysis tracker',helpSum:`<b>How to use</b> (everything runs in your browser; the video never leaves your computer)`,help:`<ol>
 <li><b>Video</b>: choose a match clip. Best results: fixed camera, whole court visible, 30 fps, a few minutes at most. It is kept in the browser storage, so it is still there after a reload.</li>
 <li><b>Engines</b> (see choices below), then <b>Weight</b> (used for calories only; changing it later updates the table at once, no re-analysis).</li>
 <li><b>Court</b>: click the 4 court corners on the picture, in this order: far-left, far-right, near-right, near-left (outer lines, doubles court). The corners are used to convert pixels into metres.</li>
 <li><b>Analyse</b>: runs the models on every frame (slow, depends on your GPU; you see what the models detect live). <b>Cancel</b> stops it and discards the partial result.</li>
-<li><b>Preview AR</b>: replays the video with the overlay (court lines, skeletons, player ids and colours, shuttle with tail and speed, mini-map with player paths, distance and kcal table). It can be replayed as often as you want; no new computation.</li>
+<li><b>Preview AR</b>: replays the video with the overlay (court lines, skeletons, player ids and colours, shuttle with tail and speed, shot type above the player and a per-player shot table on the left, mini-map with player paths, distance and kcal table). It can be replayed as often as you want; no new computation.</li>
 <li><b>Export AR mp4</b>: encodes the same overlay into a downloadable MP4 (video only, no sound).</li>
 </ol>
 <p><b>Engines - what each choice means</b></p>
@@ -25,25 +48,51 @@ fieldset{margin:.5rem 0}button{padding:.4rem .8rem}progress{width:320px;vertical
 <p><b>Court corners</b>: the accuracy of every metre value (positions, distance, calories, shuttle km/h) depends on these 4 clicks. Click precisely on the outer line intersections. Wrong order or a shifted corner gives a mirrored/skewed map and wrong distances. Only people inside the court or within 0.6 m of it are tracked (spectators and referees are ignored). The map shows the far end at the top, as in the corner order above.</p>
 <p><b>Reset</b>: clears the 4 corners <u>and</u> the analysis results (preview and export become unavailable). The video stays loaded. You must click the corners again and re-run Analyse. Use it if a corner was misplaced, or the camera moved. To only change weight, no reset is needed.</p>
 <p><small>Speeds and kcal are estimates: the shuttle speed is measured on the court plane (overestimates when the shuttle is high); calories use average METs by player speed.</small></p>
-</details>
-<fieldset><legend>1. Video</legend><input type="file" id="f" accept="video/*"> <span id="info"></span></fieldset>
-<fieldset><legend>2. Engines</legend>
- Pose: <select id="poseSel"></select>
- Shuttle: <select id="shutSel"></select>
- Weight <input id="kg" type="number" value="70" min="30" max="150" style="width:4em"> kg &nbsp; Analyse every <select id="step"><option>1<option selected>2<option>3<option>5</select> frame(s)
-</fieldset>
-<fieldset><legend>3. Court</legend>click 4 corners: far-left, far-right, near-right, near-left <button id="reset">reset</button></fieldset>
-<fieldset><legend>4. Run</legend>
- <button id="ana" disabled>Analyse</button> <button id="cancel" disabled>Cancel</button>
- <button id="prev" disabled>▶ Preview AR</button> <button id="exp" disabled>Export AR mp4</button><br>
- <progress id="bar" value="0" max="1"></progress> <span id="st">idle</span>
-</fieldset>
-<canvas id="c"></canvas><video id="v" muted playsinline style="display:none"></video>
-<script type="module">
-import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.mjs';
-import {Muxer, ArrayBufferTarget} from 'https://esm.sh/mp4-muxer@5.2.1';
-const $=id=>document.getElementById(id), v=$('v'), c=$('c'), g=c.getContext('2d',{willReadFrequently:true});
-const FPS=30, W=6.1, L=13.4; // assumed fps; badminton court metres
+`,
+ lg1:'1. Video',lg2:'2. Engines',lg3:'3. Court',lg4:'4. Run',pose:'Pose:',shuttle:'Shuttle:',weight:'Weight',every:'Analyse every',frames:'frame(s)',
+ courtTxt:'click 4 corners: far-left, far-right, near-right, near-left',reset:'reset',ana:'Analyse',cancel:'Cancel',exp:'Export AR mp4',
+ prev:'▶ Preview AR',stop:'⏸ Stop preview',replay:'↻ Replay AR',
+ pickVideo:'pick a video',corners:'click 4 court corners',courtSet:'court set: press Analyse',loadModels:'loading models...',modelErr:e=>'model error: '+e,
+ bgBuild:'building background...',err:e=>'ERROR: '+e,cancelled:'cancelled',s_previewing:'previewing',s_idle:'idle',
+ done:(t,f,n,c,b)=>`${t} players tracked, ${f} gaps filled, ${n} strokes (${c||'none'}, ${b} bad) - press Preview`,
+ playFail:e=>'play failed: '+e,prevEnd:'preview finished - press Replay',prevStop:'preview stopped - press Replay',encoding:'encoding...',expCancel:'export cancelled',
+ exported:mb=>'exported '+mb+' MB',expErr:e=>'EXPORT ERROR: '+e,p_background:'background',p_analysing:'analysing',p_encoding:'encoding',eta:'ETA',
+ P:'P',shots:'shots',tPlayer:'Player',tDist:'distance',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'frame',detected:(ms,n)=>`pose ${ms} ms, ${n} detected`,
+ 'eng:off':'off','eng:YOLOv8n-pose (1 stage, AGPL)':'YOLOv8n-pose (1 stage, AGPL)','eng:TrackNetV3 (MIT, 45 MB)':'TrackNetV3 (MIT, 45 MB)',
+ Smash:'Smash',Clear:'Clear',Drop:'Drop',Lift:'Lift','Net shot':'Net shot',Drive:'Drive',Block:'Block',Shot:'Shot','out':'out','net/short':'net/short'},
+fr:{title:"Suivi d'analyse de badminton",helpSum:`<b>Mode d'emploi</b> (tout s'exécute dans votre navigateur ; la vidéo ne quitte jamais votre ordinateur)`,help:`<ol>
+<li><b>Vidéo</b> : choisissez un extrait de match. Meilleurs résultats : caméra fixe, terrain entier visible, 30 i/s, quelques minutes au plus. Elle est conservée dans le stockage du navigateur, donc toujours là après un rechargement.</li>
+<li><b>Moteurs</b> (voir les choix ci-dessous), puis <b>Poids</b> (utilisé pour les calories uniquement ; le modifier plus tard met le tableau à jour immédiatement, sans nouvelle analyse).</li>
+<li><b>Terrain</b> : cliquez les 4 coins du terrain sur l'image, dans cet ordre : fond-gauche, fond-droite, avant-droite, avant-gauche (lignes extérieures, terrain de double). Les coins servent à convertir les pixels en mètres.</li>
+<li><b>Analyser</b> : exécute les modèles sur chaque image (lent, dépend de votre GPU ; vous voyez en direct ce que les modèles détectent). <b>Annuler</b> l'arrête et écarte le résultat partiel.</li>
+<li><b>Aperçu AR</b> : rejoue la vidéo avec la surcouche (lignes du terrain, squelettes, identifiants et couleurs des joueurs, volant avec traînée et vitesse, type de coup au-dessus du joueur et tableau des coups par joueur à gauche, mini-carte avec trajets des joueurs, tableau distance et kcal). Rejouable à volonté ; aucun nouveau calcul.</li>
+<li><b>Exporter AR mp4</b> : encode la même surcouche dans un MP4 téléchargeable (image seule, sans son).</li>
+</ol>
+<p><b>Moteurs - signification de chaque choix</b></p>
+<ul>
+<li><b>Pose : RTMPose-s + YOLOX-tiny</b> (défaut, Apache-2.0) : deux étapes, d'abord trouver chaque personne, puis estimer les 17 points du corps. Plus précis sur les joueurs petits et éloignés ; plus lent ; le premier lancement télécharge aussi environ 40 Mo.
+ <b>YOLOv8n-pose</b> : une seule étape, plus rapide, généralement moins précis sur les joueurs éloignés, et sa licence (AGPL) est contraignante si vous le réutilisez dans un produit. Mauvaise pose = mauvaise position des pieds, donc distance, calories et carte faussées.</li>
+<li><b>Volant : TrackNetV3</b> (défaut, 45 Mo) : trouve le volant sur chaque image ; nécessaire pour la traînée du volant et les km/h. Il lit 8 images à la fois et construit d'abord un fond de terrain vide, donc il marche mieux avec une caméra fixe. <b>désactivé</b> : pas de volant, pas de vitesse, mais l'analyse est plus rapide (seules les images choisies par « toutes les N » sont lues).</li>
+<li><b>Analyser toutes les N images</b> (pose uniquement) : 1 = plus précis, plus lent. 2-5 = plus rapide ; les images intermédiaires sont interpolées, donc les mouvements rapides sont lissés (distance légèrement sous-estimée). La détection du volant utilise toujours toutes les images quand elle est active.</li>
+</ul>
+<p><b>Coins du terrain</b> : la précision de toutes les valeurs en mètres (positions, distance, calories, km/h du volant) dépend de ces 4 clics. Cliquez précisément sur les intersections des lignes extérieures. Un mauvais ordre ou un coin décalé donne une carte inversée/déformée et des distances fausses. Seules les personnes sur le terrain ou à moins de 0,6 m sont suivies (spectateurs et arbitres ignorés). La carte montre le fond du terrain en haut.</p>
+<p><b>Réinitialiser</b> : efface les 4 coins <u>et</u> les résultats d'analyse (aperçu et export deviennent indisponibles). La vidéo reste chargée. Il faut recliquer les coins et relancer l'analyse. À utiliser si un coin est mal placé ou si la caméra a bougé. Pour changer seulement le poids, pas besoin de réinitialiser.</p>
+<p><small>Vitesses et kcal sont des estimations : la vitesse du volant est mesurée sur le plan du terrain (surestimée quand le volant est haut) ; les calories utilisent des METs moyens selon la vitesse du joueur.</small></p>
+`,
+ lg1:'1. Vidéo',lg2:'2. Moteurs',lg3:'3. Terrain',lg4:'4. Exécution',pose:'Pose :',shuttle:'Volant :',weight:'Poids',every:'Analyser toutes les',frames:'image(s)',
+ courtTxt:'cliquez les 4 coins : fond-gauche, fond-droite, avant-droite, avant-gauche',reset:'réinitialiser',ana:'Analyser',cancel:'Annuler',exp:'Exporter AR mp4',
+ prev:'▶ Aperçu AR',stop:"⏸ Arrêter l'aperçu",replay:'↻ Rejouer AR',
+ pickVideo:'choisissez une vidéo',corners:'cliquez les 4 coins du terrain',courtSet:'terrain défini : cliquez sur Analyser',loadModels:'chargement des modèles...',modelErr:e=>'erreur de modèle : '+e,
+ bgBuild:'construction du fond...',err:e=>'ERREUR : '+e,cancelled:'annulé',s_previewing:'lecture',s_idle:'inactif',
+ done:(t,f,n,c,b)=>`${t} joueurs suivis, ${f} trous comblés, ${n} coups (${c||'aucun'}, ${b} ratés) - cliquez sur Aperçu`,
+ playFail:e=>'lecture impossible : '+e,prevEnd:'aperçu terminé - cliquez sur Rejouer',prevStop:'aperçu arrêté - cliquez sur Rejouer',encoding:'encodage...',expCancel:'export annulé',
+ exported:mb=>'exporté '+mb+' Mo',expErr:e=>"ERREUR D'EXPORT : "+e,p_background:'fond',p_analysing:'analyse',p_encoding:'encodage',eta:'reste',
+ P:'J',shots:'coups',tPlayer:'Joueur',tDist:'distance',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'image',detected:(ms,n)=>`pose ${ms} ms, ${n} détectés`,
+ 'eng:off':'désactivé','eng:YOLOv8n-pose (1 stage, AGPL)':'YOLOv8n-pose (1 étape, AGPL)','eng:TrackNetV3 (MIT, 45 MB)':'TrackNetV3 (MIT, 45 Mo)',
+ Smash:'Smash',Clear:'Dégagement',Drop:'Amorti',Lift:'Lob','Net shot':'Jeu au filet',Drive:'Drive',Block:'Contre',Shot:'Coup','out':'sortie','net/short':'filet/court'}};
+let lang=localStorage.lang||(navigator.language.startsWith('fr')?'fr':'en'),curMsg=null;
+const T=(k,...a)=>{const x=I[lang][k]??I.en[k]??k;return typeof x==='function'?x(...a):x};
+const ts=t=>T(t),PN=id=>T('P')+(id+1);   // shot type / player name in current language
 const pts=[]; let H=null, Hinv=null, results=[], state='idle'; // results[i]={people:[{box,kp}],shuttle:[x,y]|null}
 
 // ================= state machine =================
@@ -51,11 +100,11 @@ const pts=[]; let H=null, Hinv=null, results=[], state='idle'; // results[i]={pe
 function setState(s,msg=''){state=s;
   const ready=v.src&&H, busy=['analysing','exporting'].includes(s);
   $('ana').disabled=!ready||busy||s==='previewing'; $('cancel').disabled=!busy;
-  $('prev').disabled=!results.length||busy; $('prev').textContent=s==='previewing'?'⏸ Stop preview':(played?'↻ Replay AR':'▶ Preview AR');
+  $('prev').disabled=!results.length||busy; $('prev').textContent=T(s==='previewing'?'stop':played?'replay':'prev');
   $('exp').disabled=!results.length||busy;
-  $('st').textContent=msg||s; if(!busy)$('bar').value=0;}
+  curMsg=msg||null;$('st').textContent=msg?T(...msg):T('s_'+s); if(!busy)$('bar').value=0;}
 const progress=(i,n,label)=>{$('bar').max=n;$('bar').value=i;const t=(performance.now()-t0)/1000,eta=i?t/i*(n-i):0;
-  $('st').textContent=`${label} ${i}/${n} (${(100*i/n)|0}%) ETA ${eta|0}s`};
+  $('st').textContent=`${T('p_'+label)} ${i}/${n} (${(100*i/n)|0}%) ${T('eta')} ${eta|0}s`};
 let t0=0,cancel=false;
 
 // ================= storage: OPFS =================
@@ -66,7 +115,7 @@ function load(f){v.src=URL.createObjectURL(f);v.onloadeddata=()=>{c.width=v.vide
   $('info').textContent=`${v.videoWidth}x${v.videoHeight}, ${v.duration.toFixed(1)}s`;v.currentTime=0}}
 v.onseeked=()=>{if(state!=='analysing'&&state!=='exporting'&&state!=='previewing')draw(results[fi()])};
 const fi=()=>Math.round(v.currentTime*FPS);
-function reset(){played=false;pts.length=0;H=Hinv=null;results=[];setState('idle','click 4 court corners');if(v.readyState)draw()}
+function reset(){played=false;pts.length=0;H=Hinv=null;results=[];STROKES=[];setState('idle',['corners']);if(v.readyState)draw()}
 $('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
 
 // ================= geometry =================
@@ -78,7 +127,7 @@ function homography(src,dst){const A=[];src.forEach(([x,y],i)=>{const[u,w]=dst[i
 const proj=(h,x,y)=>{const d=h[6]*x+h[7]*y+h[8];return[(h[0]*x+h[1]*y+h[2])/d,(h[3]*x+h[4]*y+h[5])/d]};
 c.onclick=e=>{if(pts.length>=4||!v.src)return;const r=c.getBoundingClientRect();
   pts.push([(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]);
-  if(pts.length===4){const C=[[0,0],[W,0],[W,L],[0,L]];H=homography(C,pts);Hinv=homography(pts,C);setState('ready','court set: press Analyse')}
+  if(pts.length===4){const C=[[0,0],[W,0],[W,L],[0,L]];H=homography(C,pts);Hinv=homography(pts,C);setState('ready',['courtSet'])}
   draw()};
 
 // ================= engines (registry: add a new model = add one entry) =================
@@ -150,8 +199,13 @@ const tracknet={name:'TrackNetV3 (MIT, 45 MB)',s:null,t:mk(TW,TH),
    out.push([sx/sw,sy/sw])}
   return out}};
 const SHUT=[{name:'off',async load(){}},tracknet];
-POSE.forEach((e,i)=>$('poseSel').add(new Option(e.name,i)));SHUT.forEach((e,i)=>$('shutSel').add(new Option(e.name,i)));
-$('poseSel').value=1;$('shutSel').value=1; // RTMPose + TrackNetV3 by default
+const fillSel=(sel,L)=>{const v0=sel.value||1;sel.innerHTML='';L.forEach((e,i)=>sel.add(new Option(T('eng:'+e.name).startsWith('eng:')?e.name:T('eng:'+e.name),i)));sel.value=v0}; // RTMPose + TrackNetV3 by default
+function applyLang(){document.documentElement.lang=lang;document.title=T('title');
+  document.querySelectorAll('[data-i]').forEach(e=>e.innerHTML=T(e.dataset.i));
+  fillSel($('poseSel'),POSE);fillSel($('shutSel'),SHUT);
+  $('lang').innerHTML=lang==='en'?'<b>EN</b> | FR':'EN | <b>FR</b>';$('lang').title=lang==='en'?'Passer en français':'Switch to English';
+  setState(state,curMsg);if(v.readyState&&state!=='analysing'&&state!=='exporting'&&state!=='previewing')draw(results[fi()],fi())}
+$('lang').onclick=()=>{lang=lang==='en'?'fr':'en';localStorage.lang=lang;applyLang()};
 
 // ================= drawing =================
 const SK=[[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
@@ -165,8 +219,11 @@ function overlay(g,res,f){
   for(const p of res.people){const col=p.id==null?'#bbb':PC[p.id%4];g.globalAlpha=p.interp?.55:1;g.strokeStyle=col;g.beginPath();
    for(const[a,b]of SK)if(p.kp[a][2]>.3&&p.kp[b][2]>.3){g.moveTo(p.kp[a][0],p.kp[a][1]);g.lineTo(p.kp[b][0],p.kp[b][1])}g.stroke();
    const[x,y]=footImg(p),[mx,my]=p.cpos||proj(Hinv,x,y);if(p.id!=null)pos.push([mx,my,p.id]);
-   g.fillStyle=col;g.strokeStyle='#fff';g.beginPath();g.arc(x,y,6,0,7);g.fill();g.stroke();g.fillStyle='#fff';g.fillText(`${p.id==null?'':'P'+(p.id+1)+' '}${mx.toFixed(1)},${my.toFixed(1)} m`,x+10,y);g.globalAlpha=1}
-  tail(g,res,f);minimap(g,pos,res,f)}
+   g.fillStyle=col;g.strokeStyle='#fff';g.beginPath();g.arc(x,y,6,0,7);g.fill();g.stroke();g.fillStyle='#fff';g.fillText(`${p.id==null?'':PN(p.id)+' '}${mx.toFixed(1)},${my.toFixed(1)} m`,x+10,y);g.globalAlpha=1}
+  if(res.labels)for(const s of res.labels){const p=res.byId&&res.byId[s.id];if(!p)continue;g.font=`bold ${Math.max(14,c.width/60)}px system-ui`;
+    g.fillStyle=s.bad?'#ff4d4d':PC[s.id%4];g.strokeStyle='#000';g.lineWidth=3;
+    const t=`${ts(s.type)}${s.post>0?' '+Math.round(s.post)+' km/h':''}${s.bad?' ['+ts(s.bad)+']':''}`,x=p.kp[0][0]-g.measureText(t).width/2,y=p.box[1]-12;g.strokeText(t,x,y);g.fillText(t,x,y)}
+  tail(g,res,f);minimap(g,pos,res,f);strokeTable(g,res,f)}
 // comet tail: length grows with speed (3 frames at rest -> 25 frames at ~440 km/h)
 function tail(g,res,f){if(!res.shuttle)return;const K=Math.max(3,Math.min(25,Math.round(3+(res.kmh||0)/20))),P=[res.shuttle];
   for(let j=1;j<=K&&f-j>=0;j++){const q=results[f-j]&&results[f-j].shuttle;if(!q)break;P.push(q)}
@@ -174,6 +231,22 @@ function tail(g,res,f){if(!res.shuttle)return;const K=Math.max(3,Math.min(25,Mat
   for(let k=P.length-1;k>=1;k--){const u=1-k/P.length;g.strokeStyle=`rgba(255,225,77,${.15+.7*u})`;g.lineWidth=r*(.3+1.2*u);
     g.beginPath();g.moveTo(P[k][0],P[k][1]);g.lineTo(P[k-1][0],P[k-1][1]);g.stroke()}
   g.fillStyle='#fff';g.strokeStyle='#ffe14d';g.lineWidth=2;g.beginPath();g.arc(P[0][0],P[0][1],r,0,7);g.fill();g.stroke();g.restore()}
+
+// per-player shot table on the left: cumulative up to frame f; bar fill relative to that player's max (min non-zero count = 20%)
+let STROKES=[];const STYPES=['Smash','Clear','Drop','Lift','Net shot','Drive','Block','Shot'];
+function strokeTable(g,res,f){
+  if(!res||!res.stats||!STROKES.length)return;const np=res.stats.length,fs=Math.max(10,c.height/60),rh=fs*1.35,pw=fs*17,m=c.width/80;
+  let y=m;g.save();g.font=`${fs}px system-ui`;g.textBaseline='middle';
+  for(let id=0;id<np;id++){const KT=STYPES.filter(t=>STROKES.some(k=>k.id===id&&k.type===t));if(!KT.length)continue;   // only kinds this player does at some point
+    const cnt=KT.map(t=>STROKES.filter(k=>k.id===id&&k.type===t&&k.f<=f).length),mx=Math.max(...cnt),nz=cnt.filter(x=>x>0),mn=nz.length?Math.min(...nz):0;
+    g.fillStyle='rgba(10,26,51,.75)';g.fillRect(m,y,pw,rh*(KT.length+1)+4);
+    g.fillStyle=PC[id%4];g.textAlign='left';g.font=`bold ${fs}px system-ui`;g.fillText(PN(id)+' '+T('shots'),m+6,y+rh/2+2);g.font=`${fs}px system-ui`;
+    KT.forEach((t,i)=>{const cy=y+rh*(i+1.5)+2,bx=m+fs*6.5,bw=fs*8,fr=!cnt[i]?0:mx===mn?1:.2+.8*(cnt[i]-mn)/(mx-mn);
+      g.fillStyle='#fff';g.textAlign='left';g.fillText(ts(t),m+6,cy);
+      g.fillStyle='rgba(255,255,255,.15)';g.fillRect(bx,cy-fs*.3,bw,fs*.6);g.fillStyle=PC[id%4];g.fillRect(bx,cy-fs*.3,bw*fr,fs*.6);
+      g.fillStyle='#fff';g.textAlign='right';g.fillText(cnt[i],m+pw-6,cy)});
+    y+=rh*(KT.length+1)+10}
+  g.restore()}
 // top-down court (far end at top) in the top-right corner; burned into preview and export
 const PC=['#22c3b4','#4b8df8','#a77bf3','#ff7a4d'];
 const TAILF=300; // path tail = last 10 s (at 30 fps)
@@ -199,13 +272,13 @@ function minimap(g,pos,res,f){
   const lh=Math.max(24,c.width/45),xr=x0+pw+6;let y=y0+ph+8;                       // speed block, then stats table (right-aligned)
   if(res&&res.kmh!=null){g.fillStyle='rgba(10,26,51,.75)';g.fillRect(x0-6,y,pw+12,lh*2.3);g.font=`bold ${Math.max(14,c.width/60)}px system-ui`;g.textAlign='center';g.fillStyle='#ffe14d';
     g.fillText(`${Math.round(res.kmh)} km/h`,x0+pw/2,y+lh);g.font=`${Math.max(12,c.width/85)}px system-ui`;g.fillStyle='#fff';
-    g.fillText(`max ${Math.round(res.kmax)} km/h (approx.)`,x0+pw/2,y+lh*1.9)}
+    g.fillText(T('maxApprox',Math.round(res.kmax)),x0+pw/2,y+lh*1.9)}
   y+=lh*2.3+8;
   if(res&&res.stats&&res.stats.length){const kg=+$('kg').value||70,fs=Math.max(12,c.width/85),rh=fs*1.6,tw=Math.max(pw+12,fs*14),xl=xr-tw;
     g.fillStyle='rgba(10,26,51,.75)';g.fillRect(xl,y,tw,rh*(res.stats.length+1)+6);g.font=`${fs}px system-ui`;g.textAlign='right';
-    g.fillStyle='#9fb3cf';g.fillText('Player',xl+fs*5,y+rh);g.fillText('distance',xl+fs*9.2,y+rh);g.fillText('kcal',xr-6,y+rh);
+    g.fillStyle='#9fb3cf';g.fillText(T('tPlayer'),xl+fs*5,y+rh);g.fillText(T('tDist'),xl+fs*9.2,y+rh);g.fillText('kcal',xr-6,y+rh);
     res.stats.forEach((st,id)=>{const yy=y+rh*(id+2);g.fillStyle=PC[id%4];g.beginPath();g.arc(xl+fs*.8,yy-fs*.35,fs*.4,0,7);g.fill();
-      g.fillStyle='#fff';g.fillText('P'+(id+1),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*9.2,yy);g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)})}
+      g.fillStyle='#fff';g.fillText(PN(id),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*9.2,yy);g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)})}
   g.restore()}
 function draw(res,f=fi()){g.drawImage(v,0,0,c.width,c.height);overlay(g,res,f)}
 
@@ -236,8 +309,8 @@ function track(res,n){
       for(let f=A.i+1;f<B.i;f++){const u=(f-A.i)/(B.i-A.i);
         out[f].people.push({id:t.id,interp:true,box:A.p.box.map((v,k)=>lerp(v,B.p.box[k],u)),
           kp:A.p.kp.map((k,q)=>[lerp(k[0],B.p.kp[q][0],u),lerp(k[1],B.p.kp[q][1],u),Math.min(k[2],B.p.kp[q][2])])})}}}
-  shuttlePost(out);statsPost(out,T.length);
-  return{out,tracks:T.length,filled:out.reduce((s,r)=>s+r.people.filter(p=>p.interp).length,0)}}
+  shuttlePost(out);statsPost(out,T.length);const strokes=strokesPost(out);STROKES=strokes;
+  return{out,strokes,tracks:T.length,filled:out.reduce((s,r)=>s+r.people.filter(p=>p.interp).length,0)}}
 
 // ================= shuttle: clean-up + speed =================
 // Speed = ground-plane distance between positions 3 frames apart. The shuttle flies above the court plane, so this is an
@@ -255,6 +328,49 @@ function shuttlePost(out){const n=out.length,gnd=p=>proj(Hinv,p[0],p[1]);
   for(let f=0;f<n;f++){const a=out[f].shuttle,b=f>=KS?out[f-KS].shuttle:null;
     if(a&&b){const pa=gnd(a),pb=gnd(b);cur=Math.hypot(pa[0]-pb[0],pa[1]-pb[1])/(KS/FPS)*3.6;age=0}else if(++age>5)cur=null;
     if(cur!=null)mx=Math.max(mx,cur);out[f].kmh=cur;out[f].kmax=mx}}
+
+
+// ================= strokes: hit detection + shot type + outcome (rule-based, approximate) =================
+// Hit = shuttle velocity jump (direction/speed) in image space with a player wrist close to the shuttle.
+// Type from: wrist above head (overhead), distance to net, speed before/after (ground-plane km/h), flight distance to next hit.
+// Bad = last shot of a rally that lands out of the court or on the hitter's own side (net/short). All thresholds are heuristics.
+const STR_GAP=90; // frames: hits farther apart than this belong to different rallies
+function strokesPost(out){
+  const n=out.length,gnd=p=>proj(Hinv,p[0],p[1]),S=f=>out[f]&&out[f].shuttle,px=c.width/1280,cand=[];
+  for(let f=3;f<n-3;f++){const a=S(f-3),b=S(f),d=S(f+3);if(!a||!b||!d)continue;
+    const v1=[(b[0]-a[0])/3,(b[1]-a[1])/3],v2=[(d[0]-b[0])/3,(d[1]-b[1])/3],s1=Math.hypot(...v1),s2=Math.hypot(...v2);
+    if(Math.max(s1,s2)<3*px)continue;
+    const ang=Math.acos(Math.max(-1,Math.min(1,(v1[0]*v2[0]+v1[1]*v2[1])/(s1*s2||1)))),ratio=Math.max(s1,s2)/(Math.min(s1,s2)||.1);
+    if(ang>.8||ratio>2.5)cand.push({f,score:ang/(Math.PI/4)+Math.log2(ratio)})}
+  cand.sort((a,b)=>b.score-a.score);const acc=[];for(const k of cand)if(!acc.some(a=>Math.abs(a.f-k.f)<8))acc.push(k);
+  const hits=[];
+  for(const k of acc){let best=null;                       // nearest wrist of any player within +-2 frames, relative to player height
+    for(let d=-2;d<=2;d++){const f=k.f+d,sh=S(f);if(!sh||!out[f])continue;
+      for(const p of out[f].people){const h=p.box[3]-p.box[1];if(!(h>0))continue;
+        for(const w of [p.kp[9],p.kp[10]]){if(w[2]<.3)continue;const dist=Math.hypot(w[0]-sh[0],w[1]-sh[1])/h;
+          if(!best||dist<best.dist)best={dist,id:p.id,wrist:w,nose:p.kp[0],h}}}}
+    if(best&&best.dist<.5&&best.id!=null)hits.push({f:k.f,...best})}
+  hits.sort((a,b)=>a.f-b.f);
+  const lastOf=f=>{let e=f,gap=0;for(let q=f+1;q<n&&gap<=10;q++){if(S(q)){e=q;gap=0}else gap++}return e};
+  const list=[];
+  hits.forEach((h,i)=>{const f=h.f,P=out[f].byId&&out[f].byId[h.id];if(!P||!P.cpos)return;
+    const nx=hits[i+1]&&hits[i+1].f-f<=STR_GAP?hits[i+1]:null,end=nx?nx.f:lastOf(f),a=gnd(S(f)),b=gnd(S(end)||S(f)),
+      travel=Math.hypot(a[0]-b[0],a[1]-b[1]),pre=out[f].kmh||0;
+    let post=0;for(let q=f+3;q<=f+5&&q<n;q++)post=Math.max(post,out[q].kmh||0);
+    const over=h.nose[2]>.3&&h.wrist[1]<h.nose[1]-.05*h.h,netd=Math.abs(P.cpos[1]-L/2);
+    let type;
+    if(over)type=post>=150?'Smash':travel>=7?'Clear':'Drop';
+    else if(netd<2.5)type=travel>=5?'Lift':'Net shot';
+    else if(pre>=130&&post<pre*.6)type='Block';
+    else if(post>=90)type='Drive';
+    else type=travel>=6?'Lift':'Shot';
+    let bad=null;
+    if(!nx){const side=P.cpos[1]<L/2?0:1,[lx,ly]=b;                // last hit of the rally: where did it land?
+      if(lx<-.3||lx>W+.3||ly<-.3||ly>L+.3)bad='out';else if((ly<L/2?0:1)===side)bad='net/short'}
+    list.push({f,id:h.id,type,post,pre,travel,bad})});
+  for(const r of out)r.labels=[];
+  for(const s of list)for(let q=s.f;q<Math.min(n,s.f+45);q++)out[q].labels.push(s);
+  return list}
 
 // ================= per-player stats =================
 // positions smoothed (5-frame mean), 1.5 cm dead-zone against jitter, steps > 12 m/s ignored.
@@ -281,31 +397,31 @@ function liveDraw(i,n){g.drawImage(v,0,0,c.width,c.height); // redraw frame, the
     for(const k of p.kp){g.fillStyle=`hsl(${Math.min(1,Math.max(0,k[2]))*120},95%,55%)`;g.beginPath();g.arc(k[0],k[1],Math.max(3,c.width/330),0,7);g.fill()}}
   g.strokeStyle='#ffe14d';g.fillStyle='#ffe14d';g.beginPath();live.shut.forEach((p,k)=>{if(!p)return;k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])});g.stroke();
   live.shut.forEach(p=>{if(p){g.beginPath();g.arc(p[0],p[1],Math.max(3,c.width/250),0,7);g.fill()}});
-  g.fillStyle='rgba(10,26,51,.75)';g.fillRect(6,6,fs*26,fs*2.2);g.fillStyle='#fff';g.fillText(`frame ${i}/${n}  ${live.msg}`,12,6+fs*1.4);g.restore()}
+  g.fillStyle='rgba(10,26,51,.75)';g.fillRect(6,6,fs*26,fs*2.2);g.fillStyle='#fff';g.fillText(`${T('frame')} ${i}/${n}  ${live.msg}`,12,6+fs*1.4);g.restore()}
 const hold=i=>results[Math.min(i,results.length-1)]; // frames skipped by "every N" reuse last analysed one
 const seek=t=>new Promise(r=>{if(Math.abs(v.currentTime-t)<1e-4&&!v.seeking)return r();v.addEventListener('seeked',r,{once:true});v.currentTime=t});
 
 // ================= analyse =================
 $('ana').onclick=async()=>{
   const pose=POSE[$('poseSel').value],shut=SHUT[$('shutSel').value],step=+$('step').value,n=Math.floor(v.duration*FPS);
-  results=[];played=false;cancel=false;setState('analysing','loading models...');
-  try{await pose.load();await shut.load()}catch(e){setState('ready','model error: '+e.message);return}
+  results=[];played=false;cancel=false;setState('analysing',['loadModels']);
+  try{await pose.load();await shut.load()}catch(e){setState('ready',['modelErr',e.message]);return}
   t0=performance.now();
   try{let bg=null;
-    if(shut.run){setState('analysing','building background...');bg=await shut.background(seek,v.duration,(i,k)=>progress(i,k,'background'));t0=performance.now()}
+    if(shut.run){setState('analysing',['bgBuild']);bg=await shut.background(seek,v.duration,(i,k)=>progress(i,k,'background'));t0=performance.now()}
     const B=shut.run?8:1;results=new Array(n);
     for(let w=0;w<n&&!cancel;w+=B){const fr=[];
       for(let j=0;j<B;j++){const i=Math.min(w+j,n-1);if(!shut.run&&i%step)continue;
         await seek(i/FPS);g.drawImage(v,0,0,c.width,c.height);
-        if(w+j<n&&i%step===0){const t1=performance.now();live.people=await pose.run(c);(results[i]??={}).people=live.people;live.msg=`pose ${(performance.now()-t1)|0} ms, ${live.people.length} detected`}
+        if(w+j<n&&i%step===0){const t1=performance.now();live.people=await pose.run(c);(results[i]??={}).people=live.people;live.msg=T('detected',(performance.now()-t1)|0,live.people.length)}
         if(shut.run)fr.push(shut.frame(c));
         liveDraw(i,n)}                                   // drawn every frame -> no blinking
       if(shut.run){const t2=performance.now();const out=await shut.run(fr,bg);live.hm=shut.hm;live.hmj=Math.min(7,fr.length-1);
         live.shut=out.map(p=>p&&[p[0]*c.width/TW,p[1]*c.height/TH]);live.msg+=`  | TrackNet ${(performance.now()-t2)|0} ms`;liveDraw(Math.min(w+live.hmj,n-1),n)
         out.forEach((p,j)=>{const i=w+j;if(i<n)(results[i]??={people:null}).shuttle=p?[p[0]*c.width/TW,p[1]*c.height/TH]:null})}
       progress(w,n,'analysing')}live.people=[];live.shut=[];live.hm=null}
-  catch(e){console.error(e);results=[];setState('ready','ERROR: '+String(e.message||e).slice(0,200));return}
-  if(cancel){results=[];setState('ready','cancelled')}else{const r=track(results,Math.floor(v.duration*FPS));results=r.out;v.currentTime=0;setState('analysed',`${r.tracks} players tracked, ${r.filled} gaps filled - press Preview`)}};
+  catch(e){console.error(e);results=[];setState('ready',['err',String(e.message||e).slice(0,200)]);return}
+  if(cancel){results=[];setState('ready',['cancelled'])}else{const r=track(results,Math.floor(v.duration*FPS));results=r.out;v.currentTime=0;{const cnt={};r.strokes.forEach(k=>cnt[k.type]=(cnt[k.type]||0)+1);console.log('strokes',r.strokes);setState('analysed',['done',r.tracks,r.filled,r.strokes.length,Object.entries(cnt).map(e=>e[1]+' '+ts(e[0])).join(', '),r.strokes.filter(k=>k.bad).length])}}};
 $('cancel').onclick=()=>cancel=true;
 
 // ================= preview (no inference, uses stored results) =================
@@ -314,30 +430,30 @@ $('prev').onclick=async()=>{
   if(state==='previewing'){v.pause();return}            // stop: the pause listener below resets the state
   const id=++runId;setState('previewing');
   await seek(0);                                         // always restart from the beginning
-  try{await v.play()}catch(e){setState('analysed','play failed: '+e.message);return}   // wait until really playing
+  try{await v.play()}catch(e){setState('analysed',['playFail',e.message]);return}   // wait until really playing
   let finished=false;
   const finish=()=>{if(finished||id!==runId)return;finished=true;v.removeEventListener('pause',finish);v.removeEventListener('ended',finish);
-    draw(hold(fi()),fi());played=true;setState('analysed',v.ended?'preview finished - press Replay':'preview stopped - press Replay')};
+    draw(hold(fi()),fi());played=true;setState('analysed',[v.ended?'prevEnd':'prevStop'])};
   v.addEventListener('pause',finish);v.addEventListener('ended',finish);              // 'ended' also fires 'pause'; guarded
   const loop=()=>{if(id!==runId||finished)return;draw(hold(fi()),fi());if(!v.paused&&!v.ended)v.requestVideoFrameCallback(loop)};
   v.requestVideoFrameCallback(loop)};
 
 // ================= export (also from stored results: fast, no inference) =================
 $('exp').onclick=async()=>{
-  const n=Math.floor(v.duration*FPS);setState('exporting','encoding...');cancel=false;t0=performance.now();
+  const n=Math.floor(v.duration*FPS);setState('exporting',['encoding']);cancel=false;t0=performance.now();
   let enc;
   try{
     const m=new Muxer({target:new ArrayBufferTarget(),video:{codec:'avc',width:c.width,height:c.height},fastStart:'in-memory'});
     let err=null;enc=new VideoEncoder({output:(ch,md)=>m.addVideoChunk(ch,md),error:e=>err=e});
     enc.configure({codec:'avc1.640034',width:c.width,height:c.height,bitrate:6e6,framerate:FPS});
-    for(let i=0;i<n;i++){if(cancel){enc.close();setState('analysed','export cancelled');return}if(err)throw err;
+    for(let i=0;i<n;i++){if(cancel){enc.close();setState('analysed',['expCancel']);return}if(err)throw err;
       await seek(i/FPS);draw(hold(i),i);
       const fr=new VideoFrame(c,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)}); // duration is required by the muxer
       enc.encode(fr,{keyFrame:i%60===0});fr.close();
       if(enc.encodeQueueSize>10)await new Promise(r=>setTimeout(r));progress(i,n,'encoding')}
     await enc.flush();if(err)throw err;m.finalize();
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([m.target.buffer],{type:'video/mp4'}));a.download='rally-ar.mp4';a.click();
-    setState('analysed','exported '+(m.target.buffer.byteLength/1e6).toFixed(1)+' MB')
-  }catch(e){console.error(e);try{enc&&enc.state!=='closed'&&enc.close()}catch{}setState('analysed','EXPORT ERROR: '+String(e.message||e).slice(0,200))}};
-setState('idle','pick a video');
+    setState('analysed',['exported',(m.target.buffer.byteLength/1e6).toFixed(1)])
+  }catch(e){console.error(e);try{enc&&enc.state!=='closed'&&enc.close()}catch{}setState('analysed',['expErr',String(e.message||e).slice(0,200)])}};
+setState('idle',['pickVideo']);applyLang();
 </script>

@@ -1,6 +1,6 @@
-# V-SKOR analysis: findings and plan for a client-only clone
+# refApp1 analysis: findings and plan for a client-only clone
 
-Source: static client JS from https://v-skor.com (build v=647), saved in `src/`.
+Source: static client JS from refApp1 (build v=647), saved in `src/`.
 Only shipped client code was read. No model or data files fetched.
 
 ## Original pipeline (all in-browser)
@@ -36,7 +36,7 @@ They are a protected asset. Do NOT decrypt/redistribute. Use open models instead
 
 ## Update: open stack identified (analisis/model/LISENSI.md on their site)
 YOLOX (Apache-2.0, player detect), RTMPose (Apache-2.0, pose), TrackNetV3 (MIT) and
-WASB-SBDT (MIT) for shuttle, YuNet (MIT, face). V-SKOR weights are retrained+encrypted,
+WASB-SBDT (MIT) for shuttle, YuNet (MIT, face). refApp1 weights are retrained+encrypted,
 but upstream open weights/code can be used for your own build.
 Court: badminton 6.1 x 13.4 m, service line 1.98 m from net (matches `core.js` consts).
 
@@ -86,3 +86,12 @@ After fix, RTMPose pipeline on a test photo: 3 people found, ~3 s first run (war
 - Export: muxer needs `duration` on every chunk -> VideoFrame now created with `duration`; the first chunk threw, so decoderConfig stayed null and finalize failed with "reading 'colorSpace'". Canvas size forced even (H.264). Export errors shown in status line.
 - Replay: the loop used to end when `v.paused` was true on its first callback (fired before play() resolved). Now: await seek(0) + await play(), end detected through 'pause'/'ended' events, guarded by a run id; seek() no longer hangs when already at the target time.
 - Verified end-to-end in headless Chrome (synthetic 2 s clip): analyse -> preview x3 (each ends, button = Replay, restarts) -> export OK.
+
+## Stroke detection (v1, rule-based)
+`strokesPost()` after `statsPost()` in `track()`. Hit = shuttle image-space velocity jump (angle > ~46 deg or speed ratio > 2.5) with a wrist within 0.5 player-heights; NMS 8 frames.
+Type: overhead (wrist above nose) -> Smash (>=150 km/h) / Clear (flight >= 7 m) / Drop; else near net (<2.5 m) -> Lift (>=5 m) / Net shot; Block (fast in, <60% out); Drive (>=90 km/h); else Lift/Shot.
+Bad = last hit of rally lands out of court or on hitter's own side (net/short). Labels burned into overlay for 45 frames (1.5 s). Thresholds are untested heuristics (TrackNet untested on real footage); tune with real matches. Not done: technique-quality scoring, audio.
+
+## TODO
+- [ ] Per-player play-style summary: one sentence per player (e.g. dominant shots, smash speed, net/out errors, distance covered), shown in the UI and burned into preview/export, EN + FR.
+- [ ] Validate the app against refApp2 (hit detection, shot types, smash speed, shuttle tracking) on the refApp2 reference video https://www.reddit.com/r/badminton/comments/1ug5dh1/automated_badminton_rally_analysis/ ; record results and tune thresholds in `strokesPost()`.

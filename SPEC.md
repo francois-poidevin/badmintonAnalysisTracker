@@ -95,3 +95,6 @@ Bad = last hit of rally lands out of court or on hitter's own side (net/short). 
 ## TODO
 - [ ] Per-player play-style summary: one sentence per player (e.g. dominant shots, smash speed, net/out errors, distance covered), shown in the UI and burned into preview/export, EN + FR.
 - [ ] Validate the app against refApp2 (hit detection, shot types, smash speed, shuttle tracking) on the refApp2 reference video https://www.reddit.com/r/badminton/comments/1ug5dh1/automated_badminton_rally_analysis/ ; record results and tune thresholds in `strokesPost()`.
+- [ ] Check hips and joints (hip/shoulder/knee keypoints) to advise on centre of gravity (balance, stance width, lean, recovery position).
+- [ ] Court occupation statistics per court area per player (heatmap, zone % of time) from court-metre tracks.
+- [ ] Fix the algorithm for singles (2 players) games: it does not assume one player per side of the net, and the id tracking switches between 2 virtual players on a side even when only one player is there. Constrain to max 1 player per side (or add a singles mode) in `track()`.

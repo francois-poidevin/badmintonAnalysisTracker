@@ -90,11 +90,11 @@ After fix, RTMPose pipeline on a test photo: 3 people found, ~3 s first run (war
 ## Stroke detection (v1, rule-based)
 `strokesPost()` after `statsPost()` in `track()`. Hit = shuttle image-space velocity jump (angle > ~46 deg or speed ratio > 2.5) with a wrist within 0.5 player-heights; NMS 8 frames.
 Type: overhead (wrist above nose) -> Smash (>=150 km/h) / Clear (flight >= 7 m) / Drop; else near net (<2.5 m) -> Lift (>=5 m) / Net shot; Block (fast in, <60% out); Drive (>=90 km/h); else Lift/Shot.
-Bad = last hit of rally lands out of court or on hitter's own side (net/short). Labels burned into overlay for 45 frames (1.5 s). Thresholds are untested heuristics (TrackNet untested on real footage); tune with real matches. Not done: technique-quality scoring, audio.
+Bad = last hit of rally lands out of court or on hitter's own side (net/short). Labels burned into overlay for 15 frames (0.5 s). Thresholds are untested heuristics (TrackNet untested on real footage); tune with real matches. Not done: technique-quality scoring, audio.
 
 ## TODO
 - [ ] Per-player play-style summary: one sentence per player (e.g. dominant shots, smash speed, net/out errors, distance covered), shown in the UI and burned into preview/export, EN + FR.
 - [ ] Validate the app against refApp2 (hit detection, shot types, smash speed, shuttle tracking) on the refApp2 reference video https://www.reddit.com/r/badminton/comments/1ug5dh1/automated_badminton_rally_analysis/ ; record results and tune thresholds in `strokesPost()`.
 - [ ] Check hips and joints (hip/shoulder/knee keypoints) to advise on centre of gravity (balance, stance width, lean, recovery position).
 - [ ] Court occupation statistics per court area per player (heatmap, zone % of time) from court-metre tracks.
-- [ ] Fix the algorithm for singles (2 players) games: it does not assume one player per side of the net, and the id tracking switches between 2 virtual players on a side even when only one player is there. Constrain to max 1 player per side (or add a singles mode) in `track()`.
+- [x] Singles mode: "Game" select (doubles/singles). In singles `track()` keeps max 1 detection per side of the net (largest box) and max 2 tracks. Untested on real singles footage.

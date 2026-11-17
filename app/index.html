@@ -88,6 +88,9 @@ details{margin:0 1.5rem 1.5rem;padding:.6rem 1rem;background:#ffffff0d;border-ra
   <label class="row"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/></svg><small data-i="game"></small><select id="game"><option value="4" data-i="dbl"></option><option value="2" data-i="sgl"></option></select></label>
   <label class="row"><svg viewBox="0 0 24 24"><path d="M6 8h12l2 12H4zM9 8a3 3 0 016 0"/></svg><small data-i="weight"></small><span class="opt"><input id="kg" type="number" value="70" min="30" max="150" style="width:5em"> kg</span></label>
   <label class="row"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M16 5v14"/></svg><small data-i="every"></small><span class="opt"><select id="step" style="width:auto"><option>1<option selected>2<option>3<option>5</select> <span data-i="frames"></span></span></label>
+ <div style="color:var(--steel);font-weight:600;margin-top:.4rem" data-i="feat"></div>
+  <label class="row"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><small data-i="react"></small><span class="opt"><input id="reactOn" type="checkbox" role="switch" style="width:auto"></span></label>
+  <label class="row"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 12h16M9 7h.01M15 16h.01M13 8h.01"/></svg><small data-i="occ"></small><span class="opt"><input id="occOn" type="checkbox" role="switch" style="width:auto"></span></label>
  </section>
 </main>
 <details id="help"><summary data-i="helpSum"></summary>
@@ -119,7 +122,7 @@ en:{title:'Badminton Analysis Tracker',helpSum:`<b>How to use</b> (everything ru
 <p><b>Reset</b>: clears the 4 corners <u>and</u> the analysis results (preview and export become unavailable). The video stays loaded. You must click the corners again and re-run Analyse. Use it if a corner was misplaced, or the camera moved. To only change weight, no reset is needed.</p>
 <p><small>Speeds and kcal are estimates: the shuttle speed is measured on the court plane (overestimates when the shuttle is high); calories use average METs by player speed.</small></p>
 `,
- lg1:'Video',lg2:'Engines',lg3:'Court',lg4:'Run',upload:'Upload your video',pose:'Pose:',shuttle:'Shuttle:',weight:'Weight',game:'Game',dbl:'Doubles (4 players)',sgl:'Singles (2 players)',every:'Analyse every',frames:'frame(s)',
+ lg1:'Video',lg2:'Engines',feat:'Features:',react:'Reaction speed',occ:'Court occupation',featOff:n=>`The feature ${n} has not been activated`,lg3:'Court',lg4:'Run',upload:'Upload your video',pose:'Pose:',shuttle:'Shuttle:',weight:'Weight',game:'Game',dbl:'Doubles (4 players)',sgl:'Singles (2 players)',every:'Analyse every',frames:'frame(s)',
  courtTxt:'click 4 corners: far-left, far-right, near-right, near-left',reset:'reset',ana:'Analyse',cancel:'Cancel',exp:'Export AR mp4',
  prev:'▶ Preview AR',stop:'⏸ Stop preview',replay:'↻ Replay AR',
  pickVideo:'pick a video',corners:'click 4 court corners',courtSet:'court set: press Analyse',loadModels:'loading models...',modelErr:e=>'model error: '+e,
@@ -127,7 +130,7 @@ en:{title:'Badminton Analysis Tracker',helpSum:`<b>How to use</b> (everything ru
  done:(t,f,n,c,b)=>`${t} players tracked, ${f} gaps filled, ${n} strokes (${c||'none'}, ${b} bad) - press Preview`,
  playFail:e=>'play failed: '+e,prevEnd:'preview finished - press Replay',prevStop:'preview stopped - press Replay',encoding:'encoding...',expCancel:'export cancelled',
  exported:mb=>'exported '+mb+' MB',expErr:e=>'EXPORT ERROR: '+e,p_background:'background',p_analysing:'analysing',p_encoding:'encoding',eta:'ETA',
- P:'P',shots:'shots',tPlayer:'Player',tDist:'distance',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'frame',detected:(ms,n)=>`pose ${ms} ms, ${n} detected`,
+ P:'P',shots:'shots',tPlayer:'Player',tDist:'distance',tReact:'react avg/min',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'frame',detected:(ms,n)=>`pose ${ms} ms, ${n} detected`,
  'eng:off':'off','eng:YOLOv8n-pose (1 stage, AGPL)':'YOLOv8n-pose (1 stage, AGPL)','eng:TrackNetV3 (MIT, 45 MB)':'TrackNetV3 (MIT, 45 MB)',
  Smash:'Smash',Clear:'Clear',Drop:'Drop',Lift:'Lift','Net shot':'Net shot',Drive:'Drive',Defense:'Defense',Kill:'Kill',Rush:'Rush',Slice:'Slice',Shot:'Shot','out':'out','net/short':'net/short'},
 fr:{title:"Badminton Analysis Tracker",helpSum:`<b>Mode d'emploi</b> (tout s'exécute dans votre navigateur ; la vidéo ne quitte jamais votre ordinateur)`,help:`<ol>
@@ -149,7 +152,7 @@ fr:{title:"Badminton Analysis Tracker",helpSum:`<b>Mode d'emploi</b> (tout s'ex�
 <p><b>Réinitialiser</b> : efface les 4 coins <u>et</u> les résultats d'analyse (aperçu et export deviennent indisponibles). La vidéo reste chargée. Il faut recliquer les coins et relancer l'analyse. À utiliser si un coin est mal placé ou si la caméra a bougé. Pour changer seulement le poids, pas besoin de réinitialiser.</p>
 <p><small>Vitesses et kcal sont des estimations : la vitesse du volant est mesurée sur le plan du terrain (surestimée quand le volant est haut) ; les calories utilisent des METs moyens selon la vitesse du joueur.</small></p>
 `,
- lg1:'Vidéo',lg2:'Moteurs',lg3:'Terrain',lg4:'Exécution',upload:'Importer votre vidéo',pose:'Pose :',shuttle:'Volant :',weight:'Poids',game:'Partie',dbl:'Double (4 joueurs)',sgl:'Simple (2 joueurs)',every:'Analyser toutes les',frames:'image(s)',
+ lg1:'Vidéo',lg2:'Moteurs',feat:'Fonctionnalités :',react:'Temps de réaction',occ:'Occupation du terrain',featOff:n=>`La fonctionnalité ${n} n'a pas été activée`,lg3:'Terrain',lg4:'Exécution',upload:'Importer votre vidéo',pose:'Pose :',shuttle:'Volant :',weight:'Poids',game:'Partie',dbl:'Double (4 joueurs)',sgl:'Simple (2 joueurs)',every:'Analyser toutes les',frames:'image(s)',
  courtTxt:'cliquez les 4 coins : fond-gauche, fond-droite, avant-droite, avant-gauche',reset:'réinitialiser',ana:'Analyser',cancel:'Annuler',exp:'Exporter AR mp4',
  prev:'▶ Aperçu AR',stop:"⏸ Arrêter l'aperçu",replay:'↻ Rejouer AR',
  pickVideo:'choisissez une vidéo',corners:'cliquez les 4 coins du terrain',courtSet:'terrain défini : cliquez sur Analyser',loadModels:'chargement des modèles...',modelErr:e=>'erreur de modèle : '+e,
@@ -157,7 +160,7 @@ fr:{title:"Badminton Analysis Tracker",helpSum:`<b>Mode d'emploi</b> (tout s'ex�
  done:(t,f,n,c,b)=>`${t} joueurs suivis, ${f} trous comblés, ${n} coups (${c||'aucun'}, ${b} ratés) - cliquez sur Aperçu`,
  playFail:e=>'lecture impossible : '+e,prevEnd:'aperçu terminé - cliquez sur Rejouer',prevStop:'aperçu arrêté - cliquez sur Rejouer',encoding:'encodage...',expCancel:'export annulé',
  exported:mb=>'exporté '+mb+' Mo',expErr:e=>"ERREUR D'EXPORT : "+e,p_background:'fond',p_analysing:'analyse',p_encoding:'encodage',eta:'reste',
- P:'J',shots:'coups',tPlayer:'Joueur',tDist:'distance',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'image',detected:(ms,n)=>`pose ${ms} ms, ${n} détectés`,
+ P:'J',shots:'coups',tPlayer:'Joueur',tDist:'distance',tReact:'réact. moy/min',maxApprox:v=>`max ${v} km/h (approx.)`,frame:'image',detected:(ms,n)=>`pose ${ms} ms, ${n} détectés`,
  'eng:off':'désactivé','eng:YOLOv8n-pose (1 stage, AGPL)':'YOLOv8n-pose (1 étape, AGPL)','eng:TrackNetV3 (MIT, 45 MB)':'TrackNetV3 (MIT, 45 Mo)',
  Smash:'Smash',Clear:'Dégagement',Drop:'Amorti',Lift:'Lob','Net shot':'Jeu au filet',Drive:'Drive',Defense:'Défense',Kill:'Kill',Rush:'Rush',Slice:'Slicé',Shot:'Coup','out':'sortie','net/short':'filet/court'}};
 let lang=localStorage.lang||(navigator.language.startsWith('fr')?'fr':'en'),curMsg=null;
@@ -170,8 +173,8 @@ const pts=[]; let H=null, Hinv=null, results=[], state='idle'; // results[i]={pe
 function setState(s,msg=''){state=s;
   const ready=v.src&&H, busy=['analysing','exporting'].includes(s);
   $('ana').disabled=!ready||busy||s==='previewing'; $('cancel').disabled=!busy;
-  $('prev').disabled=!results.length||busy; $('prev').textContent=T(s==='previewing'?'stop':played?'replay':'prev');
-  $('exp').disabled=!results.length||busy;
+  $('prev').disabled=!results.length||busy||stale; $('prev').textContent=T(s==='previewing'?'stop':played?'replay':'prev');
+  $('exp').disabled=!results.length||busy||stale;
   curMsg=msg||null;$('st').textContent=msg?T(...msg):T('s_'+s); if(!busy)$('bar').value=0;}
 const progress=(i,n,label)=>{$('bar').max=n;$('bar').value=i;const t=(performance.now()-t0)/1000,eta=i?t/i*(n-i):0;
   $('st').textContent=`${T('p_'+label)} ${i}/${n} (${(100*i/n)|0}%) ${T('eta')} ${eta|0}s`};
@@ -185,8 +188,12 @@ function load(f){v.src=URL.createObjectURL(f);v.onloadeddata=()=>{c.width=v.vide
   $('info').textContent=`${v.videoWidth}x${v.videoHeight}, ${v.duration.toFixed(1)}s`;v.currentTime=0}}
 v.onseeked=()=>{if(state!=='analysing'&&state!=='exporting'&&state!=='previewing')draw(results[fi()])};
 const fi=()=>Math.round(v.currentTime*FPS);
-function reset(){played=false;pts.length=0;H=Hinv=null;results=[];STROKES=[];setState('idle',['corners']);if(v.readyState)draw()}
-$('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
+function reset(){stale=false;played=false;pts.length=0;H=Hinv=null;results=[];STROKES=[];setState('idle',['corners']);if(v.readyState)draw()}
+// feature switched on but not computed at Analyse: hint, Replay/Export disabled (stale), Analyse stays available; court corners kept
+for(const[k,id]of[['react','reactOn'],['occ','occOn']])$(id).addEventListener('change',()=>{
+  if(state!=='analysed')return;stale=['react','occ'].some(q=>$(q==='react'?'reactOn':'occOn').checked&&!FEAT[q]);
+  setState(state,stale&&$(id).checked&&!FEAT[k]?['featOff',T(k)]:curMsg)});
+$('occOn').onchange=$('reactOn').onchange=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};$('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
 
 // ================= geometry =================
 function homography(src,dst){const A=[];src.forEach(([x,y],i)=>{const[u,w]=dst[i];
@@ -299,7 +306,7 @@ const SPD=v=>v<80?'46,204,64':v<160?'255,225,77':v<260?'255,59,48':'75,0,110'; /
 function tail(g,res,f){if(!res.shuttle)return;const K=Math.max(3,Math.min(25,Math.round(3+(res.kmh||0)/20))),P=[res.shuttle];
   for(let j=1;j<=K&&f-j>=0;j++){const q=results[f-j]&&results[f-j].shuttle;if(!q)break;P.push(q)}
   g.save();g.lineCap='round';const r=Math.max(5,c.width/170);
-  for(let k=P.length-1;k>=1;k--){const u=1-k/P.length,sp=results[f-k+1]&&results[f-k+1].kmh;g.strokeStyle=`rgba(${SPD(sp!=null?sp:res.kmh||0)},${.15+.7*u})`;g.lineWidth=r*(.3+1.2*u);
+  for(let k=P.length-1;k>=1;k--){const u=1-k/P.length;g.strokeStyle=`rgba(${SPD(res.kmh||0)},${.15+.7*u})`;g.lineWidth=r*(.3+1.2*u);
     g.beginPath();g.moveTo(P[k][0],P[k][1]);g.lineTo(P[k-1][0],P[k-1][1]);g.stroke()}
   g.fillStyle='#fff';g.strokeStyle='#ffe14d';g.lineWidth=2;g.beginPath();g.arc(P[0][0],P[0][1],r,0,7);g.fill();g.stroke();g.restore()}
 
@@ -342,11 +349,30 @@ function minimap(g,pos,res,f){
   g.restore();
   const lh=Math.max(24,c.width/45),xr=x0+pw+6;let y=y0+ph+8;                       // speed block, then stats table (right-aligned)
   
-  if(res&&res.stats&&res.stats.length){const kg=+$('kg').value||70,fs=Math.max(12,c.width/85),rh=fs*1.6,tw=Math.max(pw+12,fs*14),xl=xr-tw;
+  if(res&&res.stats&&res.stats.length){const kg=+$('kg').value||70,RO=FEAT.react&&$('reactOn').checked,fs=Math.max(12,c.width/85),rh=fs*1.6,tw=Math.max(pw+12,fs*(RO?21:14)),xl=xr-tw;
     g.fillStyle='rgba(10,26,51,.75)';g.fillRect(xl,y,tw,rh*(res.stats.length+1)+6);g.font=`${fs}px system-ui`;g.textAlign='right';
-    g.fillStyle='#9fb3cf';g.fillText(T('tPlayer'),xl+fs*5,y+rh);g.fillText(T('tDist'),xl+fs*9.2,y+rh);g.fillText('kcal',xr-6,y+rh);
+    g.fillStyle='#9fb3cf';g.fillText(T('tPlayer'),xl+fs*5,y+rh);g.fillText(T('tDist'),xl+fs*8.6,y+rh);if(RO)g.fillText(T('tReact'),xl+fs*16.5,y+rh);g.fillText('kcal',xr-6,y+rh);
     res.stats.forEach((st,id)=>{const yy=y+rh*(id+2);g.fillStyle=PC[id%4];g.beginPath();g.arc(xl+fs*.8,yy-fs*.35,fs*.4,0,7);g.fill();
-      g.fillStyle='#fff';g.fillText(PN(id),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*9.2,yy);g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)})}
+      g.fillStyle='#fff';g.fillText(PN(id),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*8.6,yy);
+      if(RO){const rs=STROKES.filter(k=>k.id===id&&k.f<=f&&k.react!=null).map(k=>k.react);
+      g.fillText(rs.length?(rs.reduce((a,b)=>a+b,0)/rs.length).toFixed(2)+'/'+Math.min(...rs).toFixed(2)+' s':'-',xl+fs*16.5,yy)}g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)});if(FEAT.occ&&$('occOn').checked)occMap(g,res,f,xr,y+rh*(res.stats.length+1)+6+8,k*.7)}
+  g.restore()}
+// court occupation: cumulative per-player heatmap (0.25 m cells, colour = player, intensity ~ time spent) + barycentre dot; incremental cache
+const OC=.25,OW=Math.ceil(W/OC),OL=Math.ceil(L/OC);let FEAT={react:false,occ:false},stale=false;let occ={f:-1,n:0,g:[],sx:[],sy:[],c:[],res:null};
+function occAt(f){if(occ.res!==results||f<occ.f){occ={f:-1,n:0,g:[],sx:[],sy:[],c:[],res:results}}
+  for(let q=occ.f+1;q<=f;q++){const r=results[q];if(!r||!r.byId)continue;
+    r.byId.forEach((p,id)=>{if(!p||!p.cpos||p.interp)return;const[x,y]=p.cpos;if(x<0||x>=W||y<0||y>=L)return;
+      if(!occ.g[id]){occ.g[id]=new Float32Array(OW*OL);occ.sx[id]=0;occ.sy[id]=0;occ.c[id]=0}
+      occ.g[id][Math.floor(y/OC)*OW+Math.floor(x/OC)]++;occ.sx[id]+=x;occ.sy[id]+=y;occ.c[id]++})}
+  occ.f=f;return occ}
+function occMap(g,res,f,xr,y0,k){if(f==null||!results.length)return;const o=occAt(f),pw=W*k,ph=L*k,x0=xr-pw,X=a=>x0+a*k,Y=a=>y0+a*k;
+  g.save();g.fillStyle='rgba(10,26,51,.75)';g.fillRect(x0-6,y0-6,pw+12,ph+12);
+  o.g.forEach((gr,id)=>{if(!gr)return;let mx=0;for(let i=0;i<gr.length;i++)if(gr[i]>mx)mx=gr[i];if(!mx)return;g.fillStyle=PC[id%4];
+    for(let i=0;i<gr.length;i++)if(gr[i]){g.globalAlpha=Math.min(.9,.12+.8*Math.sqrt(gr[i]/mx));g.fillRect(X(i%OW*OC),Y(Math.floor(i/OW)*OC),OC*k+.5,OC*k+.5)}});
+  g.globalAlpha=1;g.strokeStyle='#c6f432';g.lineWidth=Math.max(1,c.width/900);g.strokeRect(X(0),Y(0),pw,ph);
+  const seg=(a,b,c2,d)=>{g.beginPath();g.moveTo(X(a),Y(b));g.lineTo(X(c2),Y(d));g.stroke()};
+  seg(0,L/2,W,L/2);seg(0,L/2-1.98,W,L/2-1.98);seg(0,L/2+1.98,W,L/2+1.98);seg(W/2,0,W/2,L/2-1.98);seg(W/2,L/2+1.98,W/2,L);
+  if(f>=results.length-1)o.c.forEach((n,id)=>{if(!n)return;g.fillStyle=PC[id%4];g.strokeStyle='#fff';g.lineWidth=1;g.beginPath();g.arc(X(o.sx[id]/n),Y(o.sy[id]/n),Math.max(2.5,c.width/300),0,7);g.fill();g.stroke()});
   g.restore()}
 function draw(res,f=fi()){g.drawImage(v,0,0,c.width,c.height);overlay(g,res,f)}
 
@@ -441,6 +467,11 @@ function strokesPost(out){
     if(!nx){const side=P.cpos[1]<L/2?0:1,[lx,ly]=b;                // last hit of the rally: where did it land?
       if(lx<-.3||lx>W+.3||ly<-.3||ly>L+.3)bad='out';else if((ly<L/2?0:1)===side)bad='net/short'}
     list.push({f,id:h.id,type,post,pre,travel,bad})});
+  // reaction of the receiver: first frame (hit..return) where its court speed > 1 m/s; reach = time to the return hit
+  const spd=(id,q)=>{const a=out[q]&&out[q].byId&&out[q].byId[id],b=out[q-2]&&out[q-2].byId&&out[q-2].byId[id];return a&&b&&a.cpos&&b.cpos?Math.hypot(a.cpos[0]-b.cpos[0],a.cpos[1]-b.cpos[1])*FPS/2:null};
+  if(FEAT.react)for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i];if(a.id===b.id||b.f-a.f>STR_GAP)continue;
+    for(let q=a.f;q<=b.f;q++){const v=spd(b.id,q);if(v!=null&&v>1){b.react=(q-a.f)/FPS;break}}
+    b.reach=(b.f-a.f)/FPS}
   for(const r of out)r.labels=[];
   for(const s of list)for(let q=s.f;q<Math.min(n,s.f+Math.round(FPS/2));q++)out[q].labels.push(s);
   return list}
@@ -477,7 +508,7 @@ const seek=t=>new Promise(r=>{if(Math.abs(v.currentTime-t)<1e-4&&!v.seeking)retu
 // ================= analyse =================
 $('ana').onclick=async()=>{
   const pose=POSE[$('poseSel').value],shut=SHUT[$('shutSel').value],step=+$('step').value,n=Math.floor(v.duration*FPS);
-  results=[];played=false;cancel=false;setState('analysing',['loadModels']);
+  FEAT={react:$('reactOn').checked,occ:$('occOn').checked};stale=false;results=[];played=false;cancel=false;setState('analysing',['loadModels']);
   try{await pose.load();await shut.load()}catch(e){setState('ready',['modelErr',e.message]);return}
   t0=performance.now();
   try{let bg=null;

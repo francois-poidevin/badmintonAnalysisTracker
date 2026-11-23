@@ -29,4 +29,9 @@ Client-only badminton rally analyser (own implementation, inspired by refApp1). 
 - Preview end must be detected with `pause`/`ended` events after `await play()`; checking `v.paused` inside the rVFC callback ends replays instantly.
 - Draw the overlay on every frame while analysing (blinking otherwise); `liveDraw` redraws the video first.
 - Shuttle speed is a ground-plane approximation; kcal is a rough MET model; both are labelled approximate in the UI.
+- TODO: 'Built-in' toggle to display smash trajectory on the mini-map; count of rallies.
+- TODO: lower the opacity of the court borders further (currently 0.85).
+- TODO: clip the player circle so it does not overlap the legs (use the skeleton to cut it).
+- TODO: separate page for dedicated posture analysis.
+- TODO: database of best-player skeleton moves per action (smash, ...); compare posture-page skeletons against it (find open assets/datasets to derive the reference postures).
 - Known TODO: stroke/rally detection, audio in export, track id swaps when players cross. TrackNet detection is untested on real match footage.

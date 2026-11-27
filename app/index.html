@@ -29,7 +29,7 @@ main{display:grid;grid-template-columns:minmax(190px,1fr) minmax(0,3.2fr) minmax
 .tag em{font-style:normal;display:inline-block;transform:skewX(calc(-1*var(--sk)))}
 label.row{display:grid;grid-template-columns:2.2rem 1fr;align-items:center;gap:.1rem .6rem}
 label.row svg{width:2rem;height:2rem;stroke:var(--steel);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;grid-row:span 2;padding:.3rem;background:#0030499a;border-radius:10px}
-label.row small{color:var(--steel);font-weight:600}
+label.row:not(:has(svg)){grid-template-columns:1fr auto}label.row small{white-space:nowrap;color:var(--steel);font-weight:600}
 select,input[type=number]{background:#00243a;color:var(--cream);border:1px solid var(--steel);border-radius:8px;padding:.35rem .5rem;font:inherit;min-width:0;width:100%}
 .opt{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;color:var(--steel)}.opt input,.opt select{width:auto}
 /* court hint */
@@ -96,6 +96,7 @@ details{margin:0 1.5rem 1.5rem;padding:.6rem 1rem;background:#ffffff0d;border-ra
   <div style="color:var(--steel);font-weight:600;margin-top:.4rem" data-i="builtin"></div>
   <label class="row"><small data-i="skel"></small><span class="opt"><input id="skOn" type="checkbox" role="switch" style="width:auto"></span></label>
   <label class="row"><small data-i="mpos"></small><span class="opt"><input id="mOn" type="checkbox" role="switch" style="width:auto"></span></label>
+  <label class="row"><small data-i="smap"></small><span class="opt"><input id="smOn" type="checkbox" role="switch" style="width:auto"></span></label>
  </section>
 </main>
 <details id="help"><summary data-i="helpSum"></summary>
@@ -128,10 +129,10 @@ en:{title:'Badminton Analysis Tracker',helpSum:`<b>How to use</b> (everything ru
 <p><b>Reset</b>: clears the 4 corners <u>and</u> the analysis results (preview and export become unavailable). The video stays loaded. You must click the corners again and re-run Analyse. Use it if a corner was misplaced, or the camera moved. To only change weight, no reset is needed.</p>
 <p><small>Speeds and kcal are estimates: the shuttle speed is measured on the court plane (overestimates when the shuttle is high); calories use average METs by player speed.</small></p>
 `,
- lg1:'Video',lg2:'Engines',feat:'Features:',react:'Reaction speed',occ:'Court occupation',featOff:n=>`The feature ${n} has not been activated`,lg3:'Court',lg4:'Run',upload:'Upload your video',pose:'Pose:',shuttle:'Shuttle:',weight:'Weight',game:'Game',dbl:'Doubles (4 players)',sgl:'Singles (2 players)',every:'Analyse every',builtin:'Built-in',skel:'Show skeleton',mpos:'Show meter position',vfps:'Video fps',slow:'Slow-motion ×',frames:'frame(s)',
+ lg1:'Video',lg2:'Engines',feat:'Features:',react:'Reaction speed',occ:'Court occupation',featOff:n=>`The feature ${n} has not been activated`,lg3:'Court',lg4:'Run',upload:'Upload your video',pose:'Pose:',shuttle:'Shuttle:',weight:'Weight',game:'Game',dbl:'Doubles (4 players)',sgl:'Singles (2 players)',every:'Analyse every',builtin:'Built-in',smap:'Show smash map',skel:'Show skeleton',mpos:'Show meter position',vfps:'Video fps',slow:'Slow-motion ×',frames:'frame(s)',
  courtTxt:'click 4 corners: far-left, far-right, near-right, near-left',reset:'reset',ana:'Analyse',cancel:'Cancel',exp:'Export AR mp4',
  prev:'▶ Preview AR',stop:'⏸ Stop preview',replay:'↻ Replay AR',
- pickVideo:'pick a video',corners:'click 4 court corners',courtSet:'court set: press Analyse',loadModels:'loading models...',modelErr:e=>'model error: '+e,
+ pickVideo:'pick a video',corners:'click 4 court corners',courtSet:'court set: press Analyse',courtAuto:'court auto-detected (check corners): press Analyse',loadModels:'loading models...',modelErr:e=>'model error: '+e,
  bgBuild:'building background...',err:e=>'ERROR: '+e,cancelled:'cancelled',s_previewing:'previewing',s_idle:'idle',
  done:(t,f,n,c,b)=>`${t} players tracked, ${f} gaps filled, ${n} strokes (${c||'none'}, ${b} bad) - press Preview`,
  playFail:e=>'play failed: '+e,prevEnd:'preview finished - press Replay',prevStop:'preview stopped - press Replay',encoding:'encoding...',expCancel:'export cancelled',
@@ -158,10 +159,10 @@ fr:{title:"Badminton Analysis Tracker",helpSum:`<b>Mode d'emploi</b> (tout s'ex�
 <p><b>Réinitialiser</b> : efface les 4 coins <u>et</u> les résultats d'analyse (aperçu et export deviennent indisponibles). La vidéo reste chargée. Il faut recliquer les coins et relancer l'analyse. À utiliser si un coin est mal placé ou si la caméra a bougé. Pour changer seulement le poids, pas besoin de réinitialiser.</p>
 <p><small>Vitesses et kcal sont des estimations : la vitesse du volant est mesurée sur le plan du terrain (surestimée quand le volant est haut) ; les calories utilisent des METs moyens selon la vitesse du joueur.</small></p>
 `,
- lg1:'Vidéo',lg2:'Moteurs',feat:'Fonctionnalités :',react:'Temps de réaction',occ:'Occupation du terrain',featOff:n=>`La fonctionnalité ${n} n'a pas été activée`,lg3:'Terrain',lg4:'Exécution',upload:'Importer votre vidéo',pose:'Pose :',shuttle:'Volant :',weight:'Poids',game:'Partie',dbl:'Double (4 joueurs)',sgl:'Simple (2 joueurs)',every:'Analyser toutes les',builtin:'Intégré',skel:'Afficher le squelette',mpos:'Afficher la position en mètres',vfps:'Vidéo fps',slow:'Ralenti ×',frames:'image(s)',
+ lg1:'Vidéo',lg2:'Moteurs',feat:'Fonctionnalités :',react:'Temps de réaction',occ:'Occupation du terrain',featOff:n=>`La fonctionnalité ${n} n'a pas été activée`,lg3:'Terrain',lg4:'Exécution',upload:'Importer votre vidéo',pose:'Pose :',shuttle:'Volant :',weight:'Poids',game:'Partie',dbl:'Double (4 joueurs)',sgl:'Simple (2 joueurs)',every:'Analyser toutes les',builtin:'Intégré',smap:'Afficher la carte des smashs',skel:'Afficher le squelette',mpos:'Afficher la position en mètres',vfps:'Vidéo fps',slow:'Ralenti ×',frames:'image(s)',
  courtTxt:'cliquez les 4 coins : fond-gauche, fond-droite, avant-droite, avant-gauche',reset:'réinitialiser',ana:'Analyser',cancel:'Annuler',exp:'Exporter AR mp4',
  prev:'▶ Aperçu AR',stop:"⏸ Arrêter l'aperçu",replay:'↻ Rejouer AR',
- pickVideo:'choisissez une vidéo',corners:'cliquez les 4 coins du terrain',courtSet:'terrain défini : cliquez sur Analyser',loadModels:'chargement des modèles...',modelErr:e=>'erreur de modèle : '+e,
+ pickVideo:'choisissez une vidéo',corners:'cliquez les 4 coins du terrain',courtSet:'terrain défini : cliquez sur Analyser',courtAuto:'terrain détecté automatiquement (vérifiez les coins) : cliquez sur Analyser',loadModels:'chargement des modèles...',modelErr:e=>'erreur de modèle : '+e,
  bgBuild:'construction du fond...',err:e=>'ERREUR : '+e,cancelled:'annulé',s_previewing:'lecture',s_idle:'inactif',
  done:(t,f,n,c,b)=>`${t} joueurs suivis, ${f} trous comblés, ${n} coups (${c||'aucun'}, ${b} ratés) - cliquez sur Aperçu`,
  playFail:e=>'lecture impossible : '+e,prevEnd:'aperçu terminé - cliquez sur Rejouer',prevStop:'aperçu arrêté - cliquez sur Rejouer',encoding:'encodage...',expCancel:'export annulé',
@@ -190,8 +191,8 @@ let t0=0,cancel=false;
 (async()=>{try{const d=await navigator.storage.getDirectory();load(await (await d.getFileHandle('video')).getFile())}catch{}})();
 $('f').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   const d=await navigator.storage.getDirectory(),w=await (await d.getFileHandle('video',{create:true})).createWritable();await w.write(f);await w.close();load(f)};
-function load(f){v.src=URL.createObjectURL(f);v.onloadeddata=()=>{c.width=v.videoWidth&~1;c.height=v.videoHeight&~1;results=[];reset();
-  $('info').textContent=`${v.videoWidth}x${v.videoHeight}, ${v.duration.toFixed(1)}s`;v.currentTime=0;detectFps()}}
+function load(f){v.src=URL.createObjectURL(f);v.onloadeddata=async()=>{c.width=v.videoWidth&~1;c.height=v.videoHeight&~1;results=[];reset();
+  $('info').textContent=`${v.videoWidth}x${v.videoHeight}, ${v.duration.toFixed(1)}s`;v.currentTime=0;await detectFps();autoCourt()}}
 v.onseeked=()=>{if(state!=='analysing'&&state!=='exporting'&&state!=='previewing')draw(results[fi()])};
 $('fps').onchange=()=>{FPS=Math.max(5,+$('fps').value||30)};
 async function detectFps(){ // median mediaTime delta of ~20 decoded frames; snapped to standard rates
@@ -208,7 +209,7 @@ function reset(){stale=false;played=false;pts.length=0;H=Hinv=null;results=[];ST
 for(const[k,id]of[['react','reactOn'],['occ','occOn']])$(id).addEventListener('change',()=>{
   if(state!=='analysed')return;stale=['react','occ'].some(q=>$(q==='react'?'reactOn':'occOn').checked&&!FEAT[q]);
   setState(state,stale&&$(id).checked&&!FEAT[k]?['featOff',T(k)]:curMsg)});
-$('occOn').onchange=$('reactOn').onchange=$('skOn').onchange=$('mOn').onchange=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};$('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
+$('smOn').onchange=$('occOn').onchange=$('reactOn').onchange=$('skOn').onchange=$('mOn').onchange=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};$('reset').onclick=reset;$('kg').oninput=()=>{if(results.length&&state!=='previewing'&&state!=='analysing')draw(results[fi()],fi())};
 
 // ================= geometry =================
 function homography(src,dst){const A=[];src.forEach(([x,y],i)=>{const[u,w]=dst[i];
@@ -221,6 +222,72 @@ c.onclick=e=>{if(pts.length>=4||!v.src)return;const r=c.getBoundingClientRect();
   pts.push([(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]);
   if(pts.length===4){const C=[[0,0],[W,0],[W,L],[0,L]];H=homography(C,pts);Hinv=homography(pts,C);setState('ready',['courtSet'])}
   draw()};
+
+// ================= automatic court corner detection =================
+// Conservative: only for a static camera behind a baseline. White-line mask (top-hat) -> Hough lines -> every (2 horizontal x 2 steep) line
+// combination gives 4 corners -> homography -> score = share of projected court-model line samples falling on line pixels -> local refine.
+// Accepted only if score is high, clearly better than a distinct rival, and >= 2 of 3 frames agree. Otherwise nothing is set (user clicks).
+function courtLinesM(){return[[[0,0],[W,0],[W,L],[0,L],[0,0]],[[0,L/2],[W,L/2]],[[W/2,0],[W/2,L/2-1.98]],[[W/2,L/2+1.98],[W/2,L]],[[0,L/2-1.98],[W,L/2-1.98]],[[0,L/2+1.98],[W,L/2+1.98]],[[.46,0],[.46,L]],[[W-.46,0],[W-.46,L]],[[0,.76],[W,.76]],[[0,L-.76],[W,L-.76]]]}
+function detectCourt(img,cw,ch){
+  const n=cw*ch,gray=new Float32Array(n),ok=new Uint8Array(n),d=img.data;
+  for(let i=0;i<n;i++){const R=d[4*i],G=d[4*i+1],B=d[4*i+2];gray[i]=.299*R+.587*G+.114*B;ok[i]=Math.max(R,G,B)-Math.min(R,G,B)<70?1:0}
+  const I=new Float64Array((cw+1)*(ch+1)),r=10;                                   // integral image -> local mean (top-hat)
+  for(let y=0;y<ch;y++){let row=0;for(let x=0;x<cw;x++){row+=gray[y*cw+x];I[(y+1)*(cw+1)+x+1]=I[y*(cw+1)+x+1]+row}}
+  let m=new Uint8Array(n);const pts=[];
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const x0=Math.max(0,x-r),x1=Math.min(cw,x+r+1),y0=Math.max(0,y-r),y1=Math.min(ch,y+r+1),
+    mean=(I[y1*(cw+1)+x1]-I[y0*(cw+1)+x1]-I[y1*(cw+1)+x0]+I[y0*(cw+1)+x0])/((x1-x0)*(y1-y0)),i=y*cw+x;
+    if(ok[i]&&gray[i]>140&&gray[i]-mean>28){m[i]=1;pts.push(x,y)}}
+  if(pts.length<200)return null;
+  const dil=new Uint8Array(n),tmp=new Uint8Array(n);                              // 5x5 dilation = 2 px tolerance
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){let v=0;for(let k=-2;k<=2&&!v;k++){const xx=x+k;if(xx>=0&&xx<cw&&m[y*cw+xx])v=1}tmp[y*cw+x]=v}
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){let v=0;for(let k=-2;k<=2&&!v;k++){const yy=y+k;if(yy>=0&&yy<ch&&tmp[yy*cw+x])v=1}dil[y*cw+x]=v}
+  let dens=0;for(let i=0;i<n;i++)dens+=dil[i];dens/=n;
+  // Hough
+  const NT=180,RM=Math.ceil(Math.hypot(cw,ch)),NR=2*RM+1,acc=new Int32Array(NT*NR),cs=[],sn=[];
+  for(let t=0;t<NT;t++){cs.push(Math.cos(t*Math.PI/NT));sn.push(Math.sin(t*Math.PI/NT))}
+  const step=Math.max(1,Math.floor(pts.length/2/25000));
+  for(let p=0;p<pts.length;p+=2*step){const x=pts[p],y=pts[p+1];for(let t=0;t<NT;t++)acc[t*NR+Math.round(x*cs[t]+y*sn[t])+RM]++}
+  const minV=.1*cw/step,peaks=[];
+  for(let k=0;k<22;k++){let b=0,bi=-1;for(let i=0;i<acc.length;i++)if(acc[i]>b){b=acc[i];bi=i}
+    if(b<minV)break;const t=Math.floor(bi/NR),rho=bi%NR-RM;peaks.push({t,rho,v:b});
+    for(let dt=-4;dt<=4;dt++){const tt=t+dt;if(tt<0||tt>=NT)continue;for(let dr=-7;dr<=7;dr++){const rr=rho+dr+RM;if(rr>=0&&rr<NR)acc[tt*NR+rr]=0}}}
+  const hz=[],st=[];
+  for(const p of peaks){const c=cs[p.t],s=sn[p.t];if(Math.abs(c)<Math.abs(s)*.7)hz.push({c,s,rho:p.rho,y:(p.rho-c*cw/2)/s});else st.push({c,s,rho:p.rho,x:(p.rho-s*ch/2)/c})}
+  hz.sort((a,b)=>a.y-b.y);st.sort((a,b)=>a.x-b.x);
+  const X=(a,b)=>{const det=a.c*b.s-a.s*b.c;return Math.abs(det)<1e-6?null:[(a.rho*b.s-a.s*b.rho)/det,(a.c*b.rho-a.rho*b.c)/det]};
+  const C=[[0,0],[W,0],[W,L],[0,L]],lines=courtLinesM();
+  const score=P=>{const h=homography(C,P);if(h.some(v=>!isFinite(v)))return 0;let tot=0,ins=0,hit=0;
+    for(const l of lines)for(let i=0;i<l.length-1;i++){const[ax,ay]=l[i],[bx,by]=l[i+1],ns=Math.ceil(Math.hypot(bx-ax,by-ay)/.12);
+      for(let k=0;k<=ns;k++){tot++;const[u,w]=proj(h,ax+(bx-ax)*k/ns,ay+(by-ay)*k/ns),xi=Math.round(u),yi=Math.round(w);if(xi<0||xi>=cw||yi<0||yi>=ch)continue;ins++;if(dil[yi*cw+xi])hit++}}
+    return ins<.7*tot?0:hit/ins};
+  const cands=[];
+  for(let i=0;i<hz.length;i++)for(let j=i+1;j<hz.length;j++){if(hz[j].y-hz[i].y<.15*ch)continue;
+    for(let a=0;a<st.length;a++)for(let b=a+1;b<st.length;b++){if(st[b].x-st[a].x<.15*cw)continue;
+      const P=[X(hz[i],st[a]),X(hz[i],st[b]),X(hz[j],st[b]),X(hz[j],st[a])];if(P.some(q=>!q))continue;
+      if(P.some(q=>q[0]<-.02*cw||q[0]>1.02*cw||q[1]<-.02*ch||q[1]>1.02*ch))continue;
+      if(P[1][0]-P[0][0]>=(P[2][0]-P[3][0])*.98)continue;                          // far edge must be narrower (camera behind a baseline)
+      cands.push({P,sc:score(P)})}}
+  if(!cands.length)return null;cands.sort((a,b)=>b.sc-a.sc);
+  const diag=Math.hypot(cw,ch),far=(A,B)=>A.P.some((q,i)=>Math.hypot(q[0]-B.P[i][0],q[1]-B.P[i][1])>.04*diag);
+  const best=cands[0],rival=cands.find(q=>far(q,best));
+  if(best.sc<.6||(rival&&best.sc-rival.sc<.06))return null;
+  let P=best.P.map(q=>q.slice()),sc=best.sc;                                       // hill-climb refine
+  for(const sz of[3,2,1])for(let it=0;it<6;it++){let imp=false;
+    for(let i=0;i<4;i++)for(const[dx,dy]of[[sz,0],[-sz,0],[0,sz],[0,-sz]]){const Q=P.map(q=>q.slice());Q[i][0]+=dx;Q[i][1]+=dy;const s2=score(Q);if(s2>sc+1e-4){P=Q;sc=s2;imp=true}}
+    if(!imp)break}
+  if(sc<.7||sc<dens+.4)return null;
+  return{P,sc}}
+async function autoCourt(){
+  if(!v.src||H||pts.length||!v.duration)return;
+  const cw=640,ch=Math.round(v.videoHeight*cw/v.videoWidth),k=mk(cw,ch),kg=k.getContext('2d',{willReadFrequently:true}),res=[];
+  try{for(const u of[.05,.4,.75]){v.currentTime=v.duration*u;await new Promise(r=>v.addEventListener('seeked',r,{once:true}));
+      kg.drawImage(v,0,0,cw,ch);const r=detectCourt(kg.getImageData(0,0,cw,ch),cw,ch);if(r)res.push(r.P)}}
+  catch(e){console.warn('autoCourt',e)}
+  v.currentTime=0;if(res.length<2||H||pts.length)return;
+  const dg=Math.hypot(cw,ch),near=(A,B)=>A.every((q,i)=>Math.hypot(q[0]-B[i][0],q[1]-B[i][1])<.015*dg);
+  const grp=res.filter(a=>res.filter(b=>near(a,b)).length>=2);if(grp.length<2)return;   // >= 2 frames agree
+  const P=grp[0].map((q,i)=>[grp.reduce((s,a)=>s+a[i][0],0)/grp.length*c.width/cw,grp.reduce((s,a)=>s+a[i][1],0)/grp.length*c.height/ch]);
+  P.forEach(q=>pts.push(q));H=homography([[0,0],[W,0],[W,L],[0,L]],pts);Hinv=homography(pts,[[0,0],[W,0],[W,L],[0,L]]);setState('ready',['courtAuto']);draw()}
 
 // ================= engines (registry: add a new model = add one entry) =================
 // pose engine : {name, load(), run(canvas)->[{box:[x1,y1,x2,y2],kp:[[x,y,score]*17]}]}
@@ -371,7 +438,21 @@ function minimap(g,pos,res,f){
     res.stats.forEach((st,id)=>{const yy=y+rh*(id+2);g.fillStyle=PC[id%4];g.beginPath();g.arc(xl+fs*.8,yy-fs*.35,fs*.4,0,7);g.fill();
       g.fillStyle='#fff';g.fillText(PN(id),xl+fs*5,yy);g.fillText(st.d.toFixed(0)+' m',xl+fs*8.6,yy);
       if(RO){const rs=STROKES.filter(k=>k.id===id&&k.f<=f&&k.react!=null).map(k=>k.react);
-      g.fillText(rs.length?(rs.reduce((a,b)=>a+b,0)/rs.length).toFixed(2)+'/'+Math.min(...rs).toFixed(2)+' s':'-',xl+fs*16.5,yy)}g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)});if(FEAT.occ&&$('occOn').checked)occMap(g,res,f,xr,y+rh*(res.stats.length+1)+6+8,k*.7)}
+      g.fillText(rs.length?(rs.reduce((a,b)=>a+b,0)/rs.length).toFixed(2)+'/'+Math.min(...rs).toFixed(2)+' s':'-',xl+fs*16.5,yy)}g.fillText((st.ckg*kg).toFixed(1),xr-6,yy)});const oy=y+rh*(res.stats.length+1)+6+8,ok=k*.7;let sx=xr;if(FEAT.occ&&$('occOn').checked){occMap(g,res,f,xr,oy,ok);sx=xr-W*ok-18}if($('smOn').checked)smashMap(g,f,sx,oy,ok)}
+  g.restore()}
+// smash map: arrows of the smashes of the current rally (up to frame f), colour = yellow, number = smash index in rally
+function smashMap(g,f,xr,y0,k){if(f==null)return;const pw=W*k,ph=L*k,x0=xr-pw,X=a=>x0+a*k,Y=a=>y0+a*k;
+  g.save();g.fillStyle='rgba(10,26,51,.75)';g.fillRect(x0-6,y0-6,pw+12,ph+12);g.beginPath();g.rect(x0-6,y0-6,pw+12,ph+12);g.clip();
+  g.strokeStyle='#c6f432';g.lineWidth=Math.max(1,c.width/900);g.strokeRect(X(0),Y(0),pw,ph);
+  const seg=(a,b,c2,d)=>{g.beginPath();g.moveTo(X(a),Y(b));g.lineTo(X(c2),Y(d));g.stroke()};
+  seg(0,L/2,W,L/2);seg(0,L/2-1.98,W,L/2-1.98);seg(0,L/2+1.98,W,L/2+1.98);seg(W/2,0,W/2,L/2-1.98);seg(W/2,L/2+1.98,W/2,L);
+  let cur=null;for(const s of STROKES)if(s.f<=f)cur=s.rally;
+  const fs=Math.max(9,c.width/160),lw=Math.max(1.5,c.width/800);g.font=`bold ${fs}px system-ui`;g.textAlign='center';g.textBaseline='middle';
+  for(const s of STROKES)if(s.f<=f&&s.rally===cur&&s.type==='Smash'){const cl=(v,m)=>Math.max(-.5,Math.min(m+.5,v)),[ax,ay]=s.a,x1=X(cl(ax,W)),y1=Y(cl(ay,L));let x2=X(cl(s.b[0],W)),y2=Y(cl(s.b[1],L));       // shuttle is airborne: its ground projection can fall far outside the court, so clamp; start = hitter position
+    if(Math.hypot(x2-x1,y2-y1)<k*1.5){x2=x1;y2=y1+(ay<L/2?1:-1)*k*3}const an=Math.atan2(y2-y1,x2-x1),h=lw*4;
+    g.strokeStyle=g.fillStyle='#ffe14d';g.lineWidth=lw;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();
+    g.beginPath();g.moveTo(x2,y2);g.lineTo(x2-h*Math.cos(an-.45),y2-h*Math.sin(an-.45));g.lineTo(x2-h*Math.cos(an+.45),y2-h*Math.sin(an+.45));g.closePath();g.fill();
+    g.fillStyle='#fff';g.fillText(s.sidx,x1-Math.cos(an)*fs*.9,y1-Math.sin(an)*fs*.9)}
   g.restore()}
 // court occupation: cumulative per-player heatmap (0.25 m cells, colour = player, intensity ~ time spent) + barycentre dot; incremental cache
 const OC=.25,OW=Math.ceil(W/OC),OL=Math.ceil(L/OC);let FEAT={react:false,occ:false},stale=false;let occ={f:-1,n:0,g:[],sx:[],sy:[],c:[],res:null};
@@ -455,24 +536,32 @@ function strokesPost(out){
     const ang=Math.acos(Math.max(-1,Math.min(1,(v1[0]*v2[0]+v1[1]*v2[1])/(s1*s2||1)))),ratio=Math.max(s1,s2)/(Math.min(s1,s2)||.1);
     if(ang>.8||ratio>2.5)cand.push({f,score:ang/(Math.PI/4)+Math.log2(ratio)})}
   cand.sort((a,b)=>b.score-a.score);const acc=[];for(const k of cand)if(!acc.some(a=>Math.abs(a.f-k.f)<8))acc.push(k);
-  const hits=[];
+  const hits=[],near=(id,f)=>{for(let d=0;d<=30;d++)for(const q of [f-d,f+d]){const p=out[q]&&out[q].byId&&out[q].byId[id];if(p&&p.cpos)return p.cpos}return null};
   for(const k of acc){let best=null;                       // nearest wrist of any player within +-2 frames, relative to player height
     for(let d=-2;d<=2;d++){const f=k.f+d,sh=S(f);if(!sh||!out[f])continue;
       for(const p of out[f].people){const h=p.box[3]-p.box[1];if(!(h>0))continue;
         for(const w of [p.kp[9],p.kp[10]]){if(w[2]<.3)continue;const dist=Math.hypot(w[0]-sh[0],w[1]-sh[1])/h;
           if(!best||dist<best.dist)best={dist,id:p.id,wrist:w,nose:p.kp[0],h}}}}
-    if(best&&best.dist<.5&&best.id!=null)hits.push({f:k.f,...best})}
+    if(best&&best.dist<.5&&best.id!=null)hits.push({f:k.f,...best});
+    else if(S(k.f)&&k.score>=(best?2:1.2)){                  // skeleton missing: hitter = player (last known court position within +-30 frames) nearest to the shuttle on the court plane
+      const g0=gnd(S(k.f));let bi=null,bd=1e9;
+      for(let id=0;id<4;id++){const c=near(id,k.f);if(!c)continue;const d=Math.hypot(c[0]-g0[0],(c[1]-g0[1])*.6);if(d<bd){bd=d;bi=id}}
+      if(bi!=null&&bd<5)hits.push({f:k.f,id:bi,wrist:[0,0,0],nose:[0,0,0],h:0,est:true})}}
   hits.sort((a,b)=>a.f-b.f);
   const lastOf=f=>{let e=f,gap=0;for(let q=f+1;q<n&&gap<=10;q++){if(S(q)){e=q;gap=0}else gap++}return e};
   const list=[];
-  hits.forEach((h,i)=>{const f=h.f,P=out[f].byId&&out[f].byId[h.id];if(!P||!P.cpos)return;
+  hits.forEach((h,i)=>{const f=h.f,P=out[f].byId&&out[f].byId[h.id]&&out[f].byId[h.id].cpos?out[f].byId[h.id]:(near(h.id,f)?{cpos:near(h.id,f)}:null);if(!P||!P.cpos)return;
     const nx=hits[i+1]&&hits[i+1].f-f<=STR_GAP?hits[i+1]:null,end=nx?nx.f:lastOf(f),a=gnd(S(f)),b=gnd(S(end)||S(f)),
       travel=Math.hypot(a[0]-b[0],a[1]-b[1]),pre=out[f].kmh||0;
     let post=0;for(let q=f+3;q<=f+5&&q<n;q++)post=Math.max(post,out[q].kmh||0);
-    const over=h.nose[2]>.3&&h.wrist[1]<h.nose[1]-.05*h.h,netd=Math.abs(P.cpos[1]-L/2);
+    let over=false;                                       // overhead = either wrist above the head line in any frame f-4..f+2 (hit frame is approximate, far players are small/noisy)
+    for(let q=Math.max(0,f-4);q<=Math.min(n-1,f+2)&&!over;q++){const pp=out[q].byId&&out[q].byId[h.id];if(!pp)continue;const hh=pp.box[3]-pp.box[1],hy=pp.kp[0][2]>.3?pp.kp[0][1]:pp.box[1]+.12*hh;
+      over=[pp.kp[9],pp.kp[10]].some(w=>w[2]>.2&&w[1]<hy-.03*hh)}
+    const netd=Math.abs(P.cpos[1]-L/2);
     let type;
     const gapPrev=i>0&&hits[i-1].id!==h.id?f-hits[i-1].f:99;           // frames since opponent's hit
-    if(over&&netd<3&&post>=90)type='Kill';
+    if(h.est&&!over&&post>=150&&netd>=2)type='Smash';           // no skeleton: speed + distance to net only
+    else if(over&&netd<3&&post>=90)type='Kill';
     else if(over)type=post>=150?'Smash':travel>=7?'Clear':(post>=70&&post<150&&travel>=4)?'Slice':'Drop';
     else if(netd<3&&post>=90&&gapPrev<=12)type='Rush';
     else if(netd<2.5)type=travel>=5?'Lift':'Net shot';
@@ -482,7 +571,8 @@ function strokesPost(out){
     let bad=null;
     if(!nx){const side=P.cpos[1]<L/2?0:1,[lx,ly]=b;                // last hit of the rally: where did it land?
       if(lx<-.3||lx>W+.3||ly<-.3||ly>L+.3)bad='out';else if((ly<L/2?0:1)===side)bad='net/short'}
-    list.push({f,id:h.id,type,post,pre,travel,bad})});
+    list.push({f,id:h.id,type,post,pre,travel,bad,a:P.cpos,b})});
+  {let rl=0,sm=0,pv=null;for(const k of list){if(!pv||k.f-pv.f>STR_GAP){rl++;sm=0}k.rally=rl;if(k.type==='Smash')k.sidx=++sm;pv=k}}
   // reaction of the receiver: first frame (hit..return) where its court speed > 1 m/s; reach = time to the return hit
   const spd=(id,q)=>{const a=out[q]&&out[q].byId&&out[q].byId[id],b=out[q-2]&&out[q-2].byId&&out[q-2].byId[id];return a&&b&&a.cpos&&b.cpos?Math.hypot(a.cpos[0]-b.cpos[0],a.cpos[1]-b.cpos[1])*PF()/2:null};
   if(FEAT.react)for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i];if(a.id===b.id||b.f-a.f>STR_GAP)continue;

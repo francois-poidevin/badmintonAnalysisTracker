@@ -29,9 +29,13 @@ Client-only badminton rally analyser (own implementation, inspired by refApp1). 
 - Preview end must be detected with `pause`/`ended` events after `await play()`; checking `v.paused` inside the rVFC callback ends replays instantly.
 - Draw the overlay on every frame while analysing (blinking otherwise); `liveDraw` redraws the video first.
 - Shuttle speed is a ground-plane approximation; kcal is a rough MET model; both are labelled approximate in the UI.
-- TODO: 'Built-in' toggle to display smash trajectory on the mini-map; count of rallies.
+- TODO: count of rallies (rally id already stored on each stroke as `rally`).
 - TODO: lower the opacity of the court borders further (currently 0.85).
 - TODO: clip the player circle so it does not overlap the legs (use the skeleton to cut it).
 - TODO: separate page for dedicated posture analysis.
 - TODO: database of best-player skeleton moves per action (smash, ...); compare posture-page skeletons against it (find open assets/datasets to derive the reference postures).
+- Smash map (`smashMap`, toggle `#smOn`, Built-in section): second mini-map left of the occupation map, yellow arrows from hitter court position to landing (clamped to court+0.5 m, because the airborne shuttle's ground projection falls outside the court), small number = smash index in the current rally (`sidx`, `rally` set at the end of `strokesPost`).
+- Strokes: overhead test looks at either wrist above the head line over frames f-4..f+2; when no skeleton matches, hitter = nearest player (last known court pos within 30 frames) to the shuttle ground point (`est` hits, stricter score), no-skeleton smash = >=150 km/h and >=2 m from net.
+- Court auto-detect (`detectCourt`, `autoCourt`): runs after video load/OPFS restore; white-line top-hat -> Hough -> line-pair combos -> homography score vs court model -> refine; sets corners only if score >=0.7, no close rival, and 2 of 3 frames agree. Behind-baseline static cameras only; synthetic-tested, not real footage.
+- Built-in rows without icon use `label.row:not(:has(svg))` (single-line labels).
 - Known TODO: stroke/rally detection, audio in export, track id swaps when players cross. TrackNet detection is untested on real match footage.
